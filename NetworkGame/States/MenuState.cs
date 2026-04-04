@@ -119,6 +119,29 @@ public class MenuState : GameState
                     inputField.SendTextInput("Backspace");
             }
         }
+
+        bool setCursor = false;
+        foreach (InputField hoverField in _inputFields)
+        {
+            if (hoverField.Rectangle.IsPositionInRectangle(InputHandler.MousePosition))
+            {
+                SDL.SetCursor(SDL.CreateSystemCursor(SDL.SystemCursor.Text));
+                setCursor = true;
+            }
+        }
+
+
+        if (_connectButton.Rectangle.IsPositionInRectangle(InputHandler.MousePosition) ||
+            _hostButton.Rectangle.IsPositionInRectangle(InputHandler.MousePosition))
+        {
+            SDL.SetCursor(SDL.CreateSystemCursor(SDL.SystemCursor.Pointer));
+            setCursor = true;
+        }
+
+        if (!setCursor)
+        {
+            SDL.SetCursor(SDL.CreateSystemCursor(SDL.SystemCursor.Default));
+        }
     }
 
     public override void Render(Renderer renderer)
