@@ -22,29 +22,14 @@ internal static class Program
             Console.WriteLine("Running as client");
 
             SmashEngine.Init();
+            InputHandler.StartPollingTextInput();
 
             App application = new App();
             application.Start();
 
-            bool running = true;
-            while (running)
+            while (!application.ApplicationShouldClose())
             {
-                SmashEngine.Update(false);
-
-                while (SDL.PollEvent(out SDL.Event e))
-                {
-                    if (e.Type == (uint)SDL.EventType.Quit)
-                    {
-                        running = false;
-                    }
-
-                    if (e.Type == (uint)SDL.EventType.TextInput)
-                    {
-                        application.SendTextInput(Marshal.PtrToStringUTF8(e.Text.Text));
-                    }
-
-                    InputHandler.Event(e);
-                }
+                SmashEngine.Update();
 
                 application.Update(SmashEngine.DeltaTime);
                 application.Render();

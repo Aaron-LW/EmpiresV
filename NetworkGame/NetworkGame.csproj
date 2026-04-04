@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="SmashFramework" Version="1.1.39" />
+    <PackageReference Include="SmashFramework" Version="1.1.43" />
   </ItemGroup>
 
   <ItemGroup>

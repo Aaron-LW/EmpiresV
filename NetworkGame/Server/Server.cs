@@ -25,7 +25,7 @@ public class Server
         _ = HandleUdp();
 
         Console.WriteLine("Success!");
-        Console.WriteLine();
+        Console.WriteLine("SERVER_READY");
 
         while (true)
         {
@@ -55,7 +55,8 @@ public class Server
             {
                 TcpClient = client,
                 Username = loginRequestPacket.Username,
-                PlayerData = new(),
+                PlayerData = new() { Host = loginRequestPacket.Host },
+                Host = loginRequestPacket.Host
             };
 
             lock (_lock)
@@ -63,9 +64,9 @@ public class Server
                 _clients.Add(playerClient);
             }
 
-            _ = Task.Run(async () => BroadCastPacketTcp(new JoinPacket { Type = "join", Username = loginRequestPacket.Username, NewJoin = true}));
-            Console.WriteLine($"{loginRequestPacket.Username} has joined the server");
-            _ = Task.Run(async () => HandleClientTcp(playerClient));
+            await Task.Run(async () => BroadCastPacketTcp(new JoinPacket { Type = "join", Username = loginRequestPacket.Username, NewJoin = true}));
+            Console.WriteLine($"{loginRequestPacket.Username} has joined the server " + (loginRequestPacket.Host ? "as host" : ""));
+            _ = HandleClientTcp(playerClient);
         }
     }
 
@@ -73,44 +74,76 @@ public class Server
     {
         NetworkStream networkStream = playerClient.TcpClient.GetStream();
 
-        foreach (PlayerClient alreadyJoinedClient in _clients)
+        Console.WriteLine("Sending player data packets to " + playerClient.Username);
+        foreach (PlayerClient alreadyJoinedClient in _clients.ToList())
         {
-            if (alreadyJoinedClient == playerClient) continue;
-            await networkStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new PlayerDataPacket { Type = "playerData", Username = alreadyJoinedClient.Username, PlayerData = alreadyJoinedClient.PlayerData })));
+            if (alreadyJoinedClient.Username == playerClient.Username) continue;
+            Console.WriteLine($"Sending player data packet from {alreadyJoinedClient.Username} to {playerClient.Username}");
+            await networkStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new PlayerDataPacket { Type = "playerData", Username = alreadyJoinedClient.Username, PlayerData = alreadyJoinedClient.PlayerData }) + "\n"));
         }
 
+        StringBuilder stringBuilder = new();
         byte[] buffer = new byte[1024];
-        while (true)
+
+        try
         {
-            int bytesRead = await networkStream.ReadAsync(buffer, 0, buffer.Length);
-            if (bytesRead == 0)
+            while (true)
             {
-                _ = Task.Run(async () => BroadCastPacketTcp(new LeavePacket { Type = "leave", Username = playerClient.Username}));
-                Console.WriteLine($"{playerClient.Username} has left");
+                int bytesRead = await networkStream.ReadAsync(buffer, 0, buffer.Length);
 
-                lock (_lock)
+                if (bytesRead == 0)
                 {
-                    _clients.Remove(playerClient);
+                    await BroadCastPacketTcp(new LeavePacket { Type = "leave", Username = playerClient.Username});
+                    Console.WriteLine($"{playerClient.Username} has left");
+
+                    lock (_lock)
+                    {
+                        _clients.Remove(playerClient);
+                    }
+                    break;
                 }
-                break;
+
+                stringBuilder.Append(Encoding.UTF8.GetString(buffer, 0, bytesRead));
+
+                while (stringBuilder.ToString().Contains("\n"))
+                {
+                    string full = stringBuilder.ToString();
+                    int index = full.IndexOf("\n");
+
+                    string line = full.Substring(0, index).Trim();
+                    stringBuilder.Remove(0, index + 1);
+
+                    await HandlePacket(line, playerClient);
+                }
             }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Receive loop crashed: " + ex);
+        }
+    }
 
-            string json = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-            Packet? packet = JsonSerializer.Deserialize<Packet>(json);
+    private async Task HandlePacket(string json, PlayerClient playerClient)
+    {
+        Packet? packet = JsonSerializer.Deserialize<Packet>(json);
 
-            if (packet != null)
+        if (packet != null)
             {
                 switch (packet.Type)
                 {
                     case "posUpdate":
                         PositionUpdatePacket positionUpdatePacket = JsonSerializer.Deserialize<PositionUpdatePacket>(json)!;
-                        _ = BroadCastPacketTcp(positionUpdatePacket);
-                        _clients[_clients.IndexOf(playerClient)].PlayerData.X = positionUpdatePacket.X;
-                        _clients[_clients.IndexOf(playerClient)].PlayerData.Y = positionUpdatePacket.Y;
+                        await BroadCastPacketTcp(positionUpdatePacket);
+                        playerClient.PlayerData.X = positionUpdatePacket.X;
+                        playerClient.PlayerData.Y = positionUpdatePacket.Y;
+                        break;
+
+                    case "ping":
+                        PingPacket pingPacket = JsonSerializer.Deserialize<PingPacket>(json)!;
+                        await BroadCastPacketTcp(pingPacket);
                         break;
                 }
             }
-        }
     }
 
     private async Task HandleUdp()
@@ -154,12 +187,28 @@ public class Server
 
     private async Task BroadCastPacketTcp<T>(T packet) where T : Packet
     {
+        string json = JsonSerializer.Serialize(packet) + "\n";
+        byte[] data = Encoding.UTF8.GetBytes(json);
+
         foreach (PlayerClient playerClient in _clients)
         {
             if (packet.Username == playerClient.Username) continue;
 
             NetworkStream networkStream = playerClient.TcpClient.GetStream();
-            _ = Task.Run(async () => networkStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(packet))));
+
+            await playerClient.SendLock.WaitAsync();
+            try
+            {
+                await networkStream.WriteAsync(data, 0, data.Length);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Send to {playerClient.Username} failed: {ex.Message}");
+            }
+            finally
+            {
+                playerClient.SendLock.Release();
+            }
         }
     }
 
@@ -169,8 +218,8 @@ public class Server
         {
             if (packet.Username == playerClient.Username) continue;
 
-            byte[] data = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(packet));
-            _ = _udpServer!.SendAsync(data, data.Length, playerClient.UdpEndPoint);
+            byte[] data = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(packet) + "\n");
+            await _udpServer!.SendAsync(data, data.Length, playerClient.UdpEndPoint);
         }
     }
 }
