@@ -1,4 +1,3 @@
-
 public class MenuStateResult : StateResult
 {
     public required bool HostServer;

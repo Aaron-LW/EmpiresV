@@ -4,20 +4,24 @@ using System.Numerics;
 using System.Net.Sockets;
 using System.Net;
 using Smash;
+using System.Text.Json;
 
 public class LobbyState : GameState
 {
-    private readonly MenuStateResult _menuStateResult;
     private string? _localIp;
-
     private Texture2D _hostCrown;
 
-    public LobbyState(StateMachine stateMachine, Window window, MenuStateResult menuStateResult) : base(stateMachine, window)
-    {
-        _menuStateResult = menuStateResult;
-        _localIp = GetLocalIp();
+    private (string username, PlayerData playerData) _userPlayerData;
+    private Dictionary<string, PlayerData> _playerData = new();
+    private readonly object _playerDataLock = new();
 
+    public LobbyState(string username, bool host)
+    {
+        _localIp = GetLocalIp();
         _hostCrown = AssetManager.GetTexture("HostCrown");
+
+        _userPlayerData.username = username;
+        _userPlayerData.playerData = new PlayerData { Host = host };
     }
 
     public override void Update(double deltaTime)
@@ -31,18 +35,18 @@ public class LobbyState : GameState
 
 
         List<(string username, PlayerData data)> values;
-        lock (_stateMachine.PlayerDataLock)
+        lock (_playerDataLock)
         {
-            values = [(_menuStateResult.Username, new PlayerData() { Host = _menuStateResult.HostServer }), .. _stateMachine.PlayerData.Select(d => (d.Key, d.Value))];
+            values = [_userPlayerData, .. _playerData.Select(d => (d.Key, d.Value))];
         }
 
         Vector2 startPosition = new Vector2(40, 100);
         for (int i = 0; i < values.Count; i++)
         {
             Vector2 currentPosition = startPosition + new Vector2(0, 50 * i + 20 * i);
-            Rectangle rectangle = new Rectangle(currentPosition, _window.Width - 80, 50);
+            Rectangle rectangle = new Rectangle(currentPosition, App.WindowWidth - 80, 50);
             renderer.RenderFilledRectangle(rectangle, Color.FromArgb(40, 40, 40));
-            if (_menuStateResult.Username == values[i].username) renderer.RenderRectangle(rectangle, Color.White);
+            if (_userPlayerData.username == values[i].username) renderer.RenderRectangle(rectangle, Color.White);
             
             Vector2 textPosition = currentPosition + new Vector2(rectangle.Height / 2) - new Vector2(0, App.Font.MeasureString(values[i].username).Y / 2); 
             renderer.RenderText(App.Font, values[i].username, textPosition, Color.White);
@@ -52,11 +56,6 @@ public class LobbyState : GameState
                 renderer.RenderTexture(_hostCrown, textPosition + new Vector2(App.Font.MeasureString(values[i].username).X + 10, 0), Color.White, 2);
             }
         }
-    }
-
-    public override StateResult Exit()
-    {
-        throw new NotImplementedException();
     }
 
     private string? GetLocalIp()
@@ -71,5 +70,25 @@ public class LobbyState : GameState
         }
         
         return null;
+    }
+
+    public override void ForwardPacket(Packet packet, string json)
+    {
+        switch (packet.Type)
+        {
+            case "join":
+                JoinPacket joinPacket = JsonSerializer.Deserialize<JoinPacket>(json)!;
+                lock (_playerDataLock) _playerData.Add(joinPacket.Username, new PlayerData());
+                Console.WriteLine("Received join packet from " + joinPacket.Username);
+                break;
+
+            case "playerData":
+                PlayerDataPacket playerDataPacket = JsonSerializer.Deserialize<PlayerDataPacket>(json)!;
+                lock (_playerDataLock) _playerData[playerDataPacket.Username] = playerDataPacket.PlayerData;
+                Console.WriteLine("Received player data packet from " + playerDataPacket.Username);
+                break;
+        }
+        
+        base.ForwardPacket(packet, json);
     }
 }

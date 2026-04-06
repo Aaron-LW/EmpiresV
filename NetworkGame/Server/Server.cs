@@ -74,7 +74,6 @@ public class Server
     {
         NetworkStream networkStream = playerClient.TcpClient.GetStream();
 
-        Console.WriteLine("Sending player data packets to " + playerClient.Username);
         foreach (PlayerClient alreadyJoinedClient in _clients.ToList())
         {
             if (alreadyJoinedClient.Username == playerClient.Username) continue;

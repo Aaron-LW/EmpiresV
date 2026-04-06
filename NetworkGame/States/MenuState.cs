@@ -16,7 +16,7 @@ public class MenuState : GameState
 
     private List<InputField> _inputFields = new();
 
-    public MenuState(StateMachine stateMachine, Window window) : base(stateMachine, window)
+    public MenuState()
     {
         _usernameField = new InputField()
         {
@@ -30,8 +30,8 @@ public class MenuState : GameState
 
         _ipField = new InputField()
         {
-            GetX = (InputField inputField) => _window.Width / 2 - inputField.Width / 2,
-            GetY = (InputField inputField) => _window.Height / 2 - inputField.Height / 2,
+            GetX = (InputField inputField) => App.WindowWidth / 2 - inputField.Width / 2,
+            GetY = (InputField inputField) => App.WindowHeight / 2 - inputField.Height / 2,
             Width = 400,
             Height = 50,
             BackgroundColor = Color.FromArgb(35, 35, 35),
@@ -43,8 +43,8 @@ public class MenuState : GameState
 
         _connectButton = new Button()
         {
-            GetX = (Button button) => _window.Width / 2 - button.Width / 2,
-            GetY = (Button button) => _window.Height / 2 + 40,
+            GetX = (Button button) => App.WindowWidth / 2 - button.Width / 2,
+            GetY = (Button button) => App.WindowHeight / 2 + 40,
             Width = 200,
             Height = 80,
             BackgroundColor = Color.FromArgb(40, 40, 40),
@@ -80,7 +80,7 @@ public class MenuState : GameState
             {
                 if (_usernameField.Text != string.Empty && _usernameField.Text != null &&  _ipField.Text != string.Empty && _ipField.Text != null)
                 {
-                    _stateMachine.FinishState();
+                    OnStateFinish(new MenuStateResult() { HostServer = _hostServer, Ip = _ipField.Text, Username = _usernameField.Text });
                 }
             }
 
@@ -89,7 +89,7 @@ public class MenuState : GameState
                 if (_usernameField.Text != string.Empty && _usernameField.Text != null)
                 {
                     _hostServer = true;
-                    _stateMachine.FinishState();
+                    OnStateFinish(new MenuStateResult() { HostServer = _hostServer, Username = _usernameField.Text, Ip = "127.0.0.1" });
                 }
             }
         }
@@ -98,7 +98,7 @@ public class MenuState : GameState
         {
             if (_usernameField.Text != string.Empty && _usernameField.Text != null &&  _ipField.Text != string.Empty && _ipField.Text != null)
             {
-                _stateMachine.FinishState();
+                OnStateFinish(new MenuStateResult() { HostServer = _hostServer, Ip = _ipField.Text, Username = _usernameField.Text });
             }
         }
 
@@ -157,8 +157,9 @@ public class MenuState : GameState
         _hostButton.Render(renderer);
     }
 
-    public override MenuStateResult Exit()
+    protected override void OnStateFinish<MenuStateResult>(MenuStateResult menuStateResult)
     {
-        return new MenuStateResult() { Username = _usernameField.Text!, Ip = _ipField.Text!, HostServer = _hostServer };
+        SDL.SetCursor(SDL.CreateSystemCursor(SDL.SystemCursor.Default));
+        base.OnStateFinish(menuStateResult);
     }
 }

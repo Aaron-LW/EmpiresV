@@ -7,6 +7,7 @@ using System.Text.Json;
 using SDL3;
 using Smash;
 using Smash.Graphics;
+using Smash.Input;
 using Color = System.Drawing.Color;
 
 public class App : Application 
@@ -14,7 +15,10 @@ public class App : Application
     public const int POINT_SIZE = 25;
     public static Font Font = null!;
 
-    private Window _window;
+    public static float WindowWidth => _window!.Width;
+    public static float WindowHeight => _window!.Height;
+
+    private static Window? _window;
     private Renderer _renderer;
 
     private NetworkStream? _networkStream;
@@ -26,13 +30,15 @@ public class App : Application
     private float _elapsedTime;
     private float _fps;
 
-    private StateMachine _stateMachine = new();
+    private IState? _currentState;
 
     public App() 
     {
         CreateWindowAndRenderer("Networkgame", 1080, 800, out _window, out _renderer);
         _window.SetWindowResizable(true);
         SDL.StartTextInput(_window.Handle);
+
+        NotificationManager.Window = _window;
 
         AssetManager.SetDefaultScaleMode(ScaleMode.Nearest);
         AssetManager.SetAssetRootDirectory(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets"));
@@ -46,7 +52,10 @@ public class App : Application
         _renderer.SetVSyncEnabled(false);
     }
 
-    public override void Start() => _stateMachine.SetState(new MenuState(_stateMachine, _window));
+    public override void Start()
+    {
+        SetState(new MenuState());
+    }
 
     public override void Update(double deltaTime) 
     {
@@ -57,11 +66,43 @@ public class App : Application
             _fps = 1 / (float)deltaTime;
         }
 
-        _stateMachine.Update(deltaTime);
+        _currentState?.Update(deltaTime);
+        NotificationManager.Update(deltaTime);
 
-        if (_stateMachine.LastStateResult != null)
+        if (InputHandler.IsLeftMousePressed())
         {
-            if (_stateMachine.LastStateResult is MenuStateResult menuStateResult)
+            NotificationManager.Notify("test test test", NotificationLevel.Normal);
+        }
+    }
+
+    public override void Render() 
+    {
+        _renderer.Clear(Color.FromArgb(20, 20, 20));
+
+        _renderer.RenderText(Font, $"Fps: {_fps}", new Vector2(WindowWidth - Font.MeasureString($"Fps: {_fps}").X - 20, 20), Color.White);
+
+        _currentState?.Render(_renderer);
+        NotificationManager.Render(_renderer);
+
+        _renderer.RenderPresent();
+    }
+
+    public override void End() 
+    {
+        SDL.StopTextInput(_window!.Handle);
+        _window.Dispose();
+        _renderer.Dispose();
+        AssetManager.Dispose();
+        _serverProcess?.Kill();
+        _serverProcess?.WaitForExit();
+        _serverProcess?.Dispose();
+    }
+
+    private void OnStateFinish(object? sender, EventArgs e)
+    {
+        if (e is StateFinishEventArgs stateFinishEventArgs)
+        {
+            if (stateFinishEventArgs.StateResult is MenuStateResult menuStateResult)
             {
                 if (menuStateResult.HostServer)
                 {
@@ -101,7 +142,7 @@ public class App : Application
                                 }
 
                                 TryConnect(menuStateResult.Username, menuStateResult.Ip, true);
-                                _stateMachine.SetState(new LobbyState(_stateMachine, _window, menuStateResult));
+                                SetState(new LobbyState(menuStateResult.Username, menuStateResult.HostServer));
                             }
                         }
                     };
@@ -123,46 +164,30 @@ public class App : Application
                     if (connected)
                     {
                         Console.WriteLine("Connected to Server!");
-                        _stateMachine.SetState(new LobbyState(_stateMachine, _window, menuStateResult));
+                        SetState(new LobbyState(menuStateResult.Username, menuStateResult.HostServer));
                     }
                     else
                     {
                         Console.WriteLine("Couldn't connect to Server");
-                        _stateMachine.SetState(new MenuState(_stateMachine, _window));
+                        SetState(new MenuState());
                     }
                 }
             }
-
-            _stateMachine.LastStateResult = null;
         }
     }
 
-    public override void Render() 
+    private void SetState(IState newState)
     {
-        _renderer.Clear(Color.FromArgb(20, 20, 20));
-
-        _renderer.RenderText(Font, $"Fps: {_fps}", new Vector2(_window.Width - Font.MeasureString($"Fps: {_fps}").X - 20, 20), Color.White);
-
-        _stateMachine.Render(_renderer);
-
-        _renderer.RenderPresent();
+        _currentState = newState;
+        _currentState.StateFinish += OnStateFinish;
     }
-
-    public override void End() 
-    {
-        SDL.StopTextInput(_window.Handle);
-        _window.Dispose();
-        _renderer.Dispose();
-        AssetManager.Dispose();
-        _serverProcess?.Kill();
-        _serverProcess?.WaitForExit();
-        _serverProcess?.Dispose();
-    }
-
 
 
 
     
+
+
+
 
 
 
@@ -231,7 +256,7 @@ public class App : Application
             _serverEndPoint = new IPEndPoint(IPAddress.Parse(ip), 5001);
             SendPacketUdp(new Packet { Type = "udp_init", Username = username }).GetAwaiter();
 
-            _stateMachine.SetConnectionData(_networkStream, _udpClient, _serverEndPoint);
+            //_stateMachine.SetConnectionData(_networkStream, _udpClient, _serverEndPoint);
 
             _ = Task.Run(async () => ReceivePackets(false));
             _ = Task.Run(async () => ReceivePackets(true));
@@ -268,6 +293,10 @@ public class App : Application
                 if (bytesRead == 0)
                 {
                     Console.WriteLine("Disconnected from server");
+                    _networkStream = null;
+                    _udpClient = null;
+                    _serverEndPoint = null;
+                    SetState(new MenuState());
                     break;
                 }
 
@@ -292,7 +321,7 @@ public class App : Application
                     Packet? packet = JsonSerializer.Deserialize<Packet>(line);
 
                     if (packet != null)
-                        _stateMachine.ForwardPacket(packet, line);
+                        _currentState?.ForwardPacket(packet, line);
                 }
                 catch (Exception ex)
                 {
