@@ -1,4 +1,4 @@
 public class PingPacket : Packet
 {
-    public required string Message;
+    public required string Message { get; set; }
 }

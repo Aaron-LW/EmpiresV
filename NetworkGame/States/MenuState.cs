@@ -26,6 +26,7 @@ public class MenuState : GameState
             Height = 50,
             BackgroundColor = Color.FromArgb(35, 35, 35),
             TextColor = Color.White,
+            RequireInput = true
         };
 
         _ipField = new InputField()

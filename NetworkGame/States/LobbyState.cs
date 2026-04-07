@@ -5,6 +5,8 @@ using System.Net.Sockets;
 using System.Net;
 using Smash;
 using System.Text.Json;
+using Smash.Input;
+using SDL3;
 
 public class LobbyState : GameState
 {
@@ -15,6 +17,8 @@ public class LobbyState : GameState
     private Dictionary<string, PlayerData> _playerData = new();
     private readonly object _playerDataLock = new();
 
+    private InputField _chatInputField;
+
     public LobbyState(string username, bool host)
     {
         _localIp = GetLocalIp();
@@ -22,17 +26,53 @@ public class LobbyState : GameState
 
         _userPlayerData.username = username;
         _userPlayerData.playerData = new PlayerData { Host = host };
+
+        _chatInputField = new()
+        {
+            X = 0,
+            GetY = (InputField inputField) => App.WindowHeight / 2 + 125,
+            Width = 4000,
+            Height = 60,
+            TextColor = Color.White,
+            TextAlignment = Alignment.Left,
+            BackgroundColor = Color.FromArgb(35, 35, 35)
+        };
     }
 
     public override void Update(double deltaTime)
     {
+        if (InputHandler.IsLeftMousePressed())
+        {
+            if (_chatInputField.Rectangle.IsPositionInRectangle(InputHandler.MousePosition))
+                _chatInputField.Selected = true;
+            else
+                _chatInputField.Selected = false;
+        }
+
+        if (InputHandler.TextInput != null)
+        {
+            if (_chatInputField.Selected) _chatInputField.SendTextInput(InputHandler.TextInput);
+        }
+
+        if (InputHandler.IsKeyPressed(SDL.Keycode.Backspace))
+        {
+            if (_chatInputField.Selected) _chatInputField.SendTextInput("Backspace");
+        }
+
+        if (InputHandler.IsKeyPressed(SDL.Keycode.Return))
+        {
+            if (_chatInputField.Selected && !string.IsNullOrEmpty(_chatInputField.Text))
+            {
+                _ = App.SendPacketTcp(new PingPacket() { Type = "ping", Message = _chatInputField.Text, Username = _userPlayerData.username});
+                _chatInputField.Text = "";
+            }
+        }
     }
 
     public override void Render(Renderer renderer)
     {
         renderer.RenderText(App.Font, "Lobby", new Vector2(20), Color.White);
         renderer.RenderText(App.Font, $"Ip: {_localIp}", new Vector2(App.Font.MeasureString("Lobby").X + 40, 20), Color.White);
-
 
         List<(string username, PlayerData data)> values;
         lock (_playerDataLock)
@@ -56,6 +96,8 @@ public class LobbyState : GameState
                 renderer.RenderTexture(_hostCrown, textPosition + new Vector2(App.Font.MeasureString(values[i].username).X + 10, 0), Color.White, 2);
             }
         }
+
+        _chatInputField.Render(renderer);
     }
 
     private string? GetLocalIp()
@@ -86,6 +128,11 @@ public class LobbyState : GameState
                 PlayerDataPacket playerDataPacket = JsonSerializer.Deserialize<PlayerDataPacket>(json)!;
                 lock (_playerDataLock) _playerData[playerDataPacket.Username] = playerDataPacket.PlayerData;
                 Console.WriteLine("Received player data packet from " + playerDataPacket.Username);
+                break;
+
+            case "ping":
+                PingPacket pingPacket = JsonSerializer.Deserialize<PingPacket>(json)!;
+                Console.WriteLine($"Received ping from {pingPacket.Username}: {pingPacket.Message}");
                 break;
         }
         

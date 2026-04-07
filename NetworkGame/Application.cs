@@ -21,9 +21,9 @@ public class App : Application
     private static Window? _window;
     private Renderer _renderer;
 
-    private NetworkStream? _networkStream;
-    private UdpClient? _udpClient;
-    private IPEndPoint? _serverEndPoint;
+    private static NetworkStream? _networkStream;
+    private static UdpClient? _udpClient;
+    private static IPEndPoint? _serverEndPoint;
 
     private Process? _serverProcess;
 
@@ -215,13 +215,13 @@ public class App : Application
 
     // --- Fucking networking stuff ewww ---
 
-    private async Task SendPacketTcp<T>(T packet) where T : Packet
+    public static async Task SendPacketTcp<T>(T packet) where T : Packet
     {
         if (_networkStream == null) return;
-        _ =  Task.Run(async () => _networkStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(packet))));
+        _ = Task.Run(async () => _networkStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(packet) + "\n")));
     }
 
-    private async Task SendPacketUdp<T>(T packet) where T : Packet
+    public static async Task SendPacketUdp<T>(T packet) where T : Packet
     {
         if (_udpClient == null) return;
         byte[] data = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(packet));

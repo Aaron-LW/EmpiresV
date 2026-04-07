@@ -24,19 +24,22 @@ public class InputField
     public Color BackgroundColor;
 
     public string? Text;
-    public float TextX => X + Width / 2 - App.Font.MeasureString(Text!).X / 2;
+    public float TextX => GetTextX();
     public float TextY => Y + Height / 2 - App.Font.MeasureString(Text!).Y / 2;
     public Vector2 TextPosition => new Vector2(TextX, TextY);
 
     public Color TextColor;
+    public Alignment TextAlignment = Alignment.Center;
 
     public bool Selected = false;
+
+    public bool RequireInput = false;
 
     public void Render(Renderer renderer)
     {
         renderer.RenderFilledRectangle(Rectangle, BackgroundColor);
 
-        if (Text == null || Text == string.Empty) renderer.RenderRectangle(Rectangle, Color.Red);
+        if ((Text == null && RequireInput || Text == string.Empty) && RequireInput) renderer.RenderRectangle(Rectangle, Color.Red);
         if (Text != null) renderer.RenderText(App.Font, Text, Vector2.Round(TextPosition), TextColor);
         if (Selected) renderer.RenderRectangle(Rectangle, Color.White);
     }
@@ -53,5 +56,19 @@ public class InputField
         }
 
         Text += input;
+    }
+
+    private float GetTextX()
+    {
+        switch (TextAlignment)
+        {
+            case Alignment.Center:
+                return X + Width / 2 - App.Font.MeasureString(Text!).X / 2;
+
+            case Alignment.Left:
+                return X + Height / 4;
+        }
+
+        return 0;
     }
 }
