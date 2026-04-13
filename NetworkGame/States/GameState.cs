@@ -2,6 +2,8 @@ using Smash.Graphics;
 
 public abstract class GameState : IState
 {
+    public GameState(StateResult previousStateResult) { }
+
     public virtual void Enter() { }
     public virtual void Update(double deltaTime) { }
     public virtual void Render(Renderer renderer) { }

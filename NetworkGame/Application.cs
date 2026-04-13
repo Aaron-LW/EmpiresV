@@ -48,13 +48,15 @@ public class App : Application
 
         AssetManager.LoadTexture("TextureAtlas.png", _renderer);
         AssetManager.AddTextureRegion("HostCrown", new TextureRegion("TextureAtlas", 0, 0, 19, 15));
+        AssetManager.AddTextureRegion("Grass", new TextureRegion("TextureAtlas", 0, 16, 16, 16));
 
         _renderer.SetVSyncEnabled(false);
     }
 
     public override void Start()
     {
-        SetState(new MenuState());
+        //SetState(new GamingState(new StateResult { PlayerData = new PlayerData() { Username = "katzi lol", Host = true }, Type = "lobby" }));
+        SetState(new MenuState(null!));
     }
 
     public override void Update(double deltaTime) 
@@ -77,12 +79,10 @@ public class App : Application
 
     public override void Render() 
     {
-        _renderer.Clear(Color.FromArgb(20, 20, 20));
-
-        _renderer.RenderText(Font, $"Fps: {_fps}", new Vector2(WindowWidth - Font.MeasureString($"Fps: {_fps}").X - 20, 20), Color.White);
-
         _currentState?.Render(_renderer);
         NotificationManager.Render(_renderer);
+
+        _renderer.RenderText(Font, $"Fps: {_fps}", new Vector2(WindowWidth - Font.MeasureString($"Fps: {_fps}").X - 20, 20), Color.White);
 
         _renderer.RenderPresent();
     }
@@ -104,7 +104,7 @@ public class App : Application
         {
             if (stateFinishEventArgs.StateResult is MenuStateResult menuStateResult)
             {
-                if (menuStateResult.HostServer)
+                if (menuStateResult.PlayerData.Host)
                 {
                     Console.WriteLine("Starting server...");
 
@@ -141,8 +141,8 @@ public class App : Application
                                     Console.WriteLine($"Server Ip: {localIp}");
                                 }
 
-                                TryConnect(menuStateResult.Username, menuStateResult.Ip, true);
-                                SetState(new LobbyState(menuStateResult.Username, menuStateResult.HostServer));
+                                TryConnect(menuStateResult.PlayerData.Username, menuStateResult.Ip, true);
+                                SetState(new LobbyState(menuStateResult));
                             }
                         }
                     };
@@ -150,7 +150,7 @@ public class App : Application
                 }
                 else
                 {
-                    Console.WriteLine($"Username: {menuStateResult.Username}");
+                    Console.WriteLine($"Username: {menuStateResult.PlayerData.Username}");
                     Console.WriteLine($"Ip: {menuStateResult.Ip}");
 
                     string? localIp = GetLocalIp();
@@ -159,18 +159,34 @@ public class App : Application
                         Console.WriteLine($"Server Ip: {localIp}");
                     }
 
-                    bool connected = TryConnect(menuStateResult.Username, menuStateResult.Ip);
+                    bool connected = TryConnect(menuStateResult.PlayerData.Username, menuStateResult.Ip);
 
                     if (connected)
                     {
                         Console.WriteLine("Connected to Server!");
-                        SetState(new LobbyState(menuStateResult.Username, menuStateResult.HostServer));
+                        SetState(new LobbyState(menuStateResult));
                     }
                     else
                     {
                         Console.WriteLine("Couldn't connect to Server");
-                        SetState(new MenuState());
+                        SetState(new MenuState(new StateResult { PlayerData = null!, Type = "none"}));
                     }
+                }
+            }
+
+            if (stateFinishEventArgs.StateResult is LobbyStateResult lobbyStateResult)
+            {
+                if (lobbyStateResult.Seed != 0)
+                {
+                    SetState(new GamingState(stateFinishEventArgs.StateResult, lobbyStateResult.Seed));
+                }
+                else
+                {
+                    Random random = new();
+                    int seed = random.Next(100, 5000);
+
+                    SendPacketTcp(new StartGamePacket() { Type = "start_game", Username = stateFinishEventArgs.StateResult.PlayerData.Username, Seed = seed }).GetAwaiter().GetResult();
+                    SetState(new GamingState(stateFinishEventArgs.StateResult, seed));
                 }
             }
         }
@@ -296,7 +312,7 @@ public class App : Application
                     _networkStream = null;
                     _udpClient = null;
                     _serverEndPoint = null;
-                    SetState(new MenuState());
+                    SetState(new MenuState(new StateResult() { PlayerData = null!, Type = "none" }));
                     break;
                 }
 

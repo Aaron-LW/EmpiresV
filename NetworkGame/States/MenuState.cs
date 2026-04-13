@@ -16,7 +16,7 @@ public class MenuState : GameState
 
     private List<InputField> _inputFields = new();
 
-    public MenuState()
+    public MenuState(StateResult previousStateResult) : base(previousStateResult)
     {
         _usernameField = new InputField()
         {
@@ -81,7 +81,7 @@ public class MenuState : GameState
             {
                 if (_usernameField.Text != string.Empty && _usernameField.Text != null &&  _ipField.Text != string.Empty && _ipField.Text != null)
                 {
-                    OnStateFinish(new MenuStateResult() { HostServer = _hostServer, Ip = _ipField.Text, Username = _usernameField.Text });
+                    OnStateFinish(new MenuStateResult() { Ip = _ipField.Text, Type = "menu", PlayerData = new() { Username = _usernameField.Text, Host = _hostServer } });
                 }
             }
 
@@ -90,7 +90,7 @@ public class MenuState : GameState
                 if (_usernameField.Text != string.Empty && _usernameField.Text != null)
                 {
                     _hostServer = true;
-                    OnStateFinish(new MenuStateResult() { HostServer = _hostServer, Username = _usernameField.Text, Ip = "127.0.0.1" });
+                    OnStateFinish(new MenuStateResult() { Ip = "127.0.0.1", Type = "menu", PlayerData = new() { Username = _usernameField.Text, Host = _hostServer } });
                 }
             }
         }
@@ -99,7 +99,7 @@ public class MenuState : GameState
         {
             if (_usernameField.Text != string.Empty && _usernameField.Text != null &&  _ipField.Text != string.Empty && _ipField.Text != null)
             {
-                OnStateFinish(new MenuStateResult() { HostServer = _hostServer, Ip = _ipField.Text, Username = _usernameField.Text });
+                OnStateFinish(new MenuStateResult() { Ip = _ipField.Text, Type = "menu", PlayerData = new PlayerData() { Username = _usernameField.Text, Host = _hostServer } });
             }
         }
 
@@ -147,6 +147,8 @@ public class MenuState : GameState
 
     public override void Render(Renderer renderer)
     {
+        renderer.Clear(Color.FromArgb(20, 20, 20));
+
         renderer.RenderText(App.Font, "Username: ", new Vector2(20, 25), Color.White);
         _usernameField.Render(renderer);
 

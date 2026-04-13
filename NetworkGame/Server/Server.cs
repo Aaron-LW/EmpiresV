@@ -55,7 +55,7 @@ public class Server
             {
                 TcpClient = client,
                 Username = loginRequestPacket.Username,
-                PlayerData = new() { Host = loginRequestPacket.Host },
+                PlayerData = new() { Host = loginRequestPacket.Host, Username = loginRequestPacket.Username },
                 Host = loginRequestPacket.Host
             };
 
@@ -140,6 +140,11 @@ public class Server
                     case "ping":
                         PingPacket pingPacket = JsonSerializer.Deserialize<PingPacket>(json)!;
                         await BroadCastPacketTcp(pingPacket);
+                        break;
+
+                    case "start_game":
+                        StartGamePacket startGamePacket = JsonSerializer.Deserialize<StartGamePacket>(json)!;
+                        await BroadCastPacketTcp(startGamePacket);
                         break;
                 }
             }
