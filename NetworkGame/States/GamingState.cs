@@ -7,21 +7,18 @@ using Smash.Input;
 
 public class GamingState : GameState
 {
-    private const int TILE_WIDTH = 16;
-    private const int TILE_HEIGHT = 16;
+    public const int TILE_WIDTH = 16;
+    public const int TILE_HEIGHT = 16;
 
-    private const int WORLD_WIDTH = 200;
-    private const int WORLD_HEIGHT = 200;
+    private const int WORLD_WIDTH = 1600;
+    private const int WORLD_HEIGHT = 1600;
 
-    private const int CAMERA_SPEED = 500;
+    private const int CAMERA_SPEED = 2000;
 
     private float _zoom = 1;
     private float _preferredZoom = 1;
 
     private TileEngine _tileEngine;
-
-    private float _previousWindowWidth;
-    private float _previousWindowHeight;
 
     private float _cameraX;
     private float _cameraY;
@@ -29,7 +26,7 @@ public class GamingState : GameState
 
     public GamingState(StateResult previousStateResult, int worldSeed) : base(previousStateResult)
     {
-        _tileEngine = new(TILE_WIDTH, TILE_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT, 1);
+        _tileEngine = new(WORLD_WIDTH, WORLD_HEIGHT, 1);
         _tileEngine.GenerateWorld(worldSeed);
     }
 
@@ -48,19 +45,6 @@ public class GamingState : GameState
             _cameraY += beforeZoomMouseWorldPos.Y - afterZoomMouseWorldPos.Y;
         }
 
-        if (App.WindowWidth != _previousWindowWidth)
-        {
-            _tileEngine.RecalculateArrayBounds();
-            _previousWindowWidth = App.WindowWidth;
-        }
-
-        if (App.WindowHeight != _previousWindowHeight)
-        {
-            _tileEngine.RecalculateArrayBounds();
-            _previousWindowHeight = App.WindowHeight;
-        }
-
-
         Vector2 movementVector = new();
         if (InputHandler.IsKeyDown(SDL.Keycode.D)) movementVector.X += 1;
         if (InputHandler.IsKeyDown(SDL.Keycode.A)) movementVector.X -= 1;
@@ -72,7 +56,12 @@ public class GamingState : GameState
         if (InputHandler.ScrollWheelDelta != 0)
         {
             _preferredZoom += InputHandler.ScrollWheelDelta / 10;
-            _preferredZoom = Math.Max(_preferredZoom, 0.1f);
+            _preferredZoom = Math.Clamp(_preferredZoom, 0.2f, 2f);
+        }
+
+        if (InputHandler.IsMiddleMousePressed())
+        {
+            _preferredZoom = 1;
         }
     }
 
@@ -81,5 +70,6 @@ public class GamingState : GameState
         renderer.Clear(Color.CornflowerBlue);
 
         _tileEngine.Render(renderer, _cameraPosition);
+        renderer.RenderText(App.Font, _zoom.ToString(), new Vector2(20), Color.White);
     }
 }

@@ -55,7 +55,7 @@ public class App : Application
 
     public override void Start()
     {
-        //SetState(new GamingState(new StateResult { PlayerData = new PlayerData() { Username = "katzi lol", Host = true }, Type = "lobby" }));
+        //SetState(new GamingState(new StateResult { PlayerData = new PlayerData() { Username = "katzi lol", Host = true }, Type = "lobby" }, Random.Shared.Next(100, 5000)));
         SetState(new MenuState(null!));
     }
 

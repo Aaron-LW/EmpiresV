@@ -1,36 +1,23 @@
+using System.Drawing;
 using System.Numerics;
 using SDL3;
 using Smash.Graphics;
 
 public class TileEngine
 {
-    private readonly int _tileWidht;
-    private readonly int _tileHeight;
-
     private readonly int _mapWidth;
     private readonly int _mapHeight;
 
-    private Tile[] _tiles = [];
-
-    private int MAX_TILES => (((int)App.WindowWidth / (int)(_tileWidht * _zoom)) + 2) * (((int)App.WindowHeight / (int)(_tileHeight * _zoom)) + 2);
-
-    private SDL.Vertex[] _vertices = [];
-    private int[] _indices = [];
-
     private float _zoom = 1;
 
-    public TileEngine(int tileWidth, int tileHeight, int mapWidth, int mapHeight, float baseZoom)
+    private Dictionary<Vector2, Chunk> _chunks = new();
+
+    public TileEngine(int mapWidth, int mapHeight, float baseZoom)
     {
         _zoom = baseZoom;
 
-        _tileWidht = tileWidth;
-        _tileHeight = tileHeight;
-
         _mapWidth = mapWidth;
         _mapHeight = mapHeight;
-
-        RecalculateArrayBounds();
-        _tiles = new Tile[_mapWidth * _mapHeight];
     }
 
     public void GenerateWorld(int seed)
@@ -42,7 +29,6 @@ public class TileEngine
         noise.SetCellularJitter(0.5f);
         noise.SetFrequency(0.03f);
 
-
         for (int y = 0; y < _mapHeight; y++)
         {
             for (int x = 0; x < _mapWidth; x++)
@@ -51,113 +37,142 @@ public class TileEngine
                 if (brightness < 0.4f) brightness = 0.4f;
                 if (brightness > 0.4f) brightness = 1f;
 
-                _tiles[y * _mapWidth + x] = new Tile(x * _tileWidht, y * _tileHeight, AssetManager.GetTexture("Grass"), brightness);
+                Chunk chunk = GetOrCreateChunk(new Vector2(x * GamingState.TILE_WIDTH, y * GamingState.TILE_HEIGHT));
+
+                int chunkX = x * GamingState.TILE_WIDTH % Chunk.CHUNK_PIXEL_WIDTH;
+                int chunkY = y * GamingState.TILE_HEIGHT % Chunk.CHUNK_PIXEL_HEIGHT;
+
+                chunk.PlaceTileAt(new Vector2(chunkX, chunkY), AssetManager.GetTexture("Grass"), brightness);
             }
         }
     }
 
     public void Render(Renderer renderer, Vector2 offset)
     {
-        int drawnTiles = RecalculateVertices(offset);
-        RenderGeometry(renderer, AssetManager.GetTexture("TextureAtlas").Handle, drawnTiles);
+        Vector2 startPos = offset + Vector2.One;
 
+        float pixelsX = startPos.X + ((App.WindowWidth + Chunk.CHUNK_PIXEL_WIDTH * 2) / _zoom);
+        float pixelsY = startPos.Y + ((App.WindowHeight + Chunk.CHUNK_PIXEL_HEIGHT * 2) / _zoom);
 
-        //unsafe
-        //{
-        //    SDL.FRect srcRect = new SDL.FRect { X = 0, Y = 16, W = 16, H = 16 };
-        //    SDL.FRect dstRect = new SDL.FRect { X = 0, Y = 0, W = 100, H = 16 };
+        for (float y = startPos.Y; y < pixelsY; y += Chunk.CHUNK_PIXEL_HEIGHT)
+        {
+            for (float x = startPos.X; x < pixelsX; x += Chunk.CHUNK_PIXEL_WIDTH)
+            {
+                Vector2 chunkPosition = AlignToChunkGrid(new Vector2(x, y));
+                    
+                if (_chunks.TryGetValue(chunkPosition, out Chunk? chunk))
+                {
+                    if (chunk.Dirty)
+                    {
+                        chunk.RebuildChunk(renderer);
+                    }
 
-        //    SDL.RenderTextureTiled(renderer.Handle, AssetManager.GetTexture("TextureAtlas").Handle, srcRect, 1, dstRect);
-        //}
+                    renderer.RenderTexture(new Texture2D(chunk.RenderTarget, "lol"), (chunkPosition - offset) * _zoom, Color.White, _zoom);
+                }
+            }
+        }
     }
 
     public void SetZoom(float newZoom)
     {
         _zoom = newZoom;
-        RecalculateArrayBounds();
     }
 
-    private void RenderGeometry(Renderer renderer ,nint textureHandle, int length)
+    private Vector2 AlignToChunkGrid(Vector2 worldPosition)
     {
-        SDL.RenderGeometry(renderer.Handle, textureHandle, _vertices, length * 4, _indices, length * 6);
+        return new Vector2((int)MathF.Floor(worldPosition.X / Chunk.CHUNK_PIXEL_WIDTH) * Chunk.CHUNK_PIXEL_WIDTH,
+                           (int)MathF.Floor(worldPosition.Y / Chunk.CHUNK_PIXEL_HEIGHT) * Chunk.CHUNK_PIXEL_HEIGHT);
     }
 
-    private int RecalculateVertices(Vector2 offset)
+    private Chunk GetOrCreateChunk(Vector2 worldPosition)
     {
-        int startTileX = (int)offset.X / _tileWidht;
-        int startTileY = (int)offset.Y / _tileHeight;
+        Vector2 chunkPosition = AlignToChunkGrid(worldPosition);
 
-        int tilesX = ((int)App.WindowWidth / (int)(_tileWidht * _zoom)) + 2;
-        int tilesY = ((int)App.WindowHeight / (int)(_tileHeight * _zoom)) + 2;
-
-        int drawnTiles = 0;
-
-        float tileWidth = _tileWidht * _zoom;
-        float tileHeight = _tileHeight * _zoom;
-
-        for (int y = startTileY; y < startTileY + tilesY; y++)
+        if (_chunks.TryGetValue(chunkPosition, out Chunk? foundChunk))
         {
-            for (int x = startTileX; x < startTileX + tilesX; x++)
-            {
-                if (x >= _mapWidth || y >= _mapHeight || x < 0 || y < 0) continue;
-                
-                Tile? tile = _tiles[y * _mapWidth + x];
-                if (tile == null) continue;
-
-                int baseIndex = drawnTiles * 4;
-
-                float xPos = (tile.X - offset.X) * _zoom;
-                float yPos = (tile.Y - offset.Y) * _zoom;
-
-                //Positions
-                _vertices[baseIndex + 0].Position.X = xPos;
-                _vertices[baseIndex + 0].Position.Y = yPos;
-
-                _vertices[baseIndex + 1].Position.X = xPos + tileWidth;
-                _vertices[baseIndex + 1].Position.Y = yPos;
-
-                _vertices[baseIndex + 2].Position.X = xPos + tileWidth;
-                _vertices[baseIndex + 2].Position.Y = yPos + tileHeight;
-
-                _vertices[baseIndex + 3].Position.X = xPos;
-                _vertices[baseIndex + 3].Position.Y = yPos + tileHeight;
-
-                SDL.FColor topVertexColor = new SDL.FColor { R = tile.Brightness, G = tile.Brightness, B = tile.Brightness, A = 1.0f };
-                SDL.FColor bottomVertexColor = new SDL.FColor { R = tile.Brightness, G = tile.Brightness, B = tile.Brightness, A = 1.0f};
-
-                //Color
-                _vertices[baseIndex + 0].Color = topVertexColor;
-                _vertices[baseIndex + 1].Color = topVertexColor;
-                _vertices[baseIndex + 2].Color = bottomVertexColor;
-                _vertices[baseIndex + 3].Color = bottomVertexColor;
-
-                //TexCoords
-                _vertices[baseIndex + 0].TexCoord = new SDL.FPoint { X = tile.TexX, Y = tile.TexY};
-                _vertices[baseIndex + 1].TexCoord = new SDL.FPoint { X = tile.TexX + 0.5f, Y = tile.TexY};
-                _vertices[baseIndex + 2].TexCoord = new SDL.FPoint { X = tile.TexX + 0.5f, Y = tile.TexY + 0.5f};
-                _vertices[baseIndex + 3].TexCoord = new SDL.FPoint { X = tile.TexX, Y = tile.TexY + 0.5f};
-
-                drawnTiles++;
-            }
+            return foundChunk;
         }
 
-        return drawnTiles;
+        _chunks.Add(chunkPosition, new Chunk());
+        return _chunks[chunkPosition];
     }
 
-    public void RecalculateArrayBounds()
-    {
-        _vertices = new SDL.Vertex[MAX_TILES * 4];
-        _indices = new int[MAX_TILES * 6];
+    //private int RecalculateVertices(Vector2 offset)
+    //{
+    //    int startTileX = (int)offset.X / _tileWidht;
+    //    int startTileY = (int)offset.Y / _tileHeight;
 
-        for (int i = 0; i < MAX_TILES; i++)
-        {
-            int baseIndex = i * 4;
-            _indices[i * 6 + 0] = baseIndex + 0;
-            _indices[i * 6 + 1] = baseIndex + 1;
-            _indices[i * 6 + 2] = baseIndex + 2;
-            _indices[i * 6 + 3] = baseIndex + 0;
-            _indices[i * 6 + 4] = baseIndex + 2;
-            _indices[i * 6 + 5] = baseIndex + 3;
-        }
-    }
+    //    int tilesX = ((int)App.WindowWidth / (int)(_tileWidht * _zoom)) + 2;
+    //    int tilesY = ((int)App.WindowHeight / (int)(_tileHeight * _zoom)) + 2;
+
+    //    int drawnTiles = 0;
+
+    //    float tileWidth = _tileWidht * _zoom;
+    //    float tileHeight = _tileHeight * _zoom;
+
+    //    for (int y = startTileY; y < startTileY + tilesY; y++)
+    //    {
+    //        for (int x = startTileX; x < startTileX + tilesX; x++)
+    //        {
+    //            if (x >= _mapWidth || y >= _mapHeight || x < 0 || y < 0) continue;
+    //            
+    //            Tile? tile = _tiles[y * _mapWidth + x];
+    //            if (tile == null) continue;
+
+    //            int baseIndex = drawnTiles * 4;
+
+    //            float xPos = (tile.X - offset.X) * _zoom;
+    //            float yPos = (tile.Y - offset.Y) * _zoom;
+
+    //            //Positions
+    //            _vertices[baseIndex + 0].Position.X = xPos;
+    //            _vertices[baseIndex + 0].Position.Y = yPos;
+
+    //            _vertices[baseIndex + 1].Position.X = xPos + tileWidth;
+    //            _vertices[baseIndex + 1].Position.Y = yPos;
+
+    //            _vertices[baseIndex + 2].Position.X = xPos + tileWidth;
+    //            _vertices[baseIndex + 2].Position.Y = yPos + tileHeight;
+
+    //            _vertices[baseIndex + 3].Position.X = xPos;
+    //            _vertices[baseIndex + 3].Position.Y = yPos + tileHeight;
+
+    //            SDL.FColor topVertexColor = new SDL.FColor { R = tile.Brightness, G = tile.Brightness, B = tile.Brightness, A = 1.0f };
+    //            SDL.FColor bottomVertexColor = new SDL.FColor { R = tile.Brightness, G = tile.Brightness, B = tile.Brightness, A = 1.0f};
+
+    //            //Color
+    //            _vertices[baseIndex + 0].Color = topVertexColor;
+    //            _vertices[baseIndex + 1].Color = topVertexColor;
+    //            _vertices[baseIndex + 2].Color = bottomVertexColor;
+    //            _vertices[baseIndex + 3].Color = bottomVertexColor;
+
+    //            //TexCoords
+    //            _vertices[baseIndex + 0].TexCoord = new SDL.FPoint { X = tile.TexX, Y = tile.TexY};
+    //            _vertices[baseIndex + 1].TexCoord = new SDL.FPoint { X = tile.TexX + 0.5f, Y = tile.TexY};
+    //            _vertices[baseIndex + 2].TexCoord = new SDL.FPoint { X = tile.TexX + 0.5f, Y = tile.TexY + 0.5f};
+    //            _vertices[baseIndex + 3].TexCoord = new SDL.FPoint { X = tile.TexX, Y = tile.TexY + 0.5f};
+
+    //            drawnTiles++;
+    //        }
+    //    }
+
+    //    return drawnTiles;
+    //}
+
+    //public void RecalculateArrayBounds()
+    //{
+    //    _vertices = new SDL.Vertex[MAX_TILES * 4];
+    //    _indices = new int[MAX_TILES * 6];
+
+    //    for (int i = 0; i < MAX_TILES; i++)
+    //    {
+    //        int baseIndex = i * 4;
+    //        _indices[i * 6 + 0] = baseIndex + 0;
+    //        _indices[i * 6 + 1] = baseIndex + 1;
+    //        _indices[i * 6 + 2] = baseIndex + 2;
+    //        _indices[i * 6 + 3] = baseIndex + 0;
+    //        _indices[i * 6 + 4] = baseIndex + 2;
+    //        _indices[i * 6 + 5] = baseIndex + 3;
+    //    }
+    //}
 }
