@@ -27,15 +27,19 @@ public class TileEngine
         noise.SetCellularDistanceFunction(FastNoiseLite.CellularDistanceFunction.EuclideanSq);
         noise.SetCellularReturnType(FastNoiseLite.CellularReturnType.CellValue);
         noise.SetCellularJitter(0.5f);
-        noise.SetFrequency(0.03f);
+        noise.SetFrequency(0.002f);
 
         for (int y = 0; y < _mapHeight; y++)
         {
             for (int x = 0; x < _mapWidth; x++)
             {
-                float brightness = noise.GetNoise(x, y);
-                if (brightness < 0.4f) brightness = 0.4f;
-                if (brightness > 0.4f) brightness = 1f;
+                float noiseValue = noise.GetNoise(x, y);
+
+                float brightness = 1f;
+
+                if (noiseValue < 1f) brightness = 1;
+                if (noiseValue < 0.65f) brightness = 0.65f;
+                if (noiseValue < 0.4f) brightness = 0.4f;
 
                 Chunk chunk = GetOrCreateChunk(new Vector2(x * GamingState.TILE_WIDTH, y * GamingState.TILE_HEIGHT));
 

@@ -70,6 +70,5 @@ public class GamingState : GameState
         renderer.Clear(Color.CornflowerBlue);
 
         _tileEngine.Render(renderer, _cameraPosition);
-        renderer.RenderText(App.Font, _zoom.ToString(), new Vector2(20), Color.White);
     }
 }
