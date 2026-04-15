@@ -22,20 +22,12 @@ public class Chunk
     public Chunk()
     {
         FillBuffers();
-
-        for (int y = 0; y < CHUNK_HEIGHT; y++)
-        {
-            for (int x = 0; x < CHUNK_WIDHT; x++)
-            {
-                _tiles[y * CHUNK_WIDHT + x] = new Tile(x * GamingState.TILE_WIDTH, y * GamingState.TILE_HEIGHT, AssetManager.GetTexture("Grass"), 1f);
-            }
-        }
     }
 
     public void RebuildChunk(Renderer renderer)
     {
         RecalculateVertices();
-        RenderTarget = SDL.CreateTexture(renderer.Handle, SDL.PixelFormat.ABGR128Float, SDL.TextureAccess.Target, CHUNK_WIDHT * GamingState.TILE_WIDTH, CHUNK_HEIGHT * GamingState.TILE_HEIGHT);
+        RenderTarget = SDL.CreateTexture(renderer.Handle, SDL.PixelFormat.RGBA128Float, SDL.TextureAccess.Target, CHUNK_WIDHT * GamingState.TILE_WIDTH, CHUNK_HEIGHT * GamingState.TILE_HEIGHT);
         SDL.SetTextureScaleMode(RenderTarget, SDL.ScaleMode.Nearest);
 
         SDL.SetRenderTarget(renderer.Handle, RenderTarget);
@@ -57,6 +49,11 @@ public class Chunk
     private void RecalculateVertices()
     {
         int drawnTiles = 0;
+
+        Texture2D textureAtlas = AssetManager.GetTexture("TextureAtlas");
+
+        float texWidth = 16f / (float)textureAtlas.Width;
+        float texHeight = 16f / (float)textureAtlas.Height;
 
         for (int y = 0; y < CHUNK_HEIGHT; y++)
         {
@@ -90,10 +87,10 @@ public class Chunk
                 _vertices[baseIndex + 3].Color = bottomVertexColor;
 
                 //TexCoords
-                _vertices[baseIndex + 0].TexCoord = new SDL.FPoint { X = tile.TexX, Y = tile.TexY};
-                _vertices[baseIndex + 1].TexCoord = new SDL.FPoint { X = tile.TexX + 0.5f, Y = tile.TexY};
-                _vertices[baseIndex + 2].TexCoord = new SDL.FPoint { X = tile.TexX + 0.5f, Y = tile.TexY + 0.5f};
-                _vertices[baseIndex + 3].TexCoord = new SDL.FPoint { X = tile.TexX, Y = tile.TexY + 0.5f};
+                _vertices[baseIndex + 0].TexCoord = new SDL.FPoint { X = tile.TexX,            Y = tile.TexY};
+                _vertices[baseIndex + 1].TexCoord = new SDL.FPoint { X = tile.TexX + texWidth, Y = tile.TexY};
+                _vertices[baseIndex + 2].TexCoord = new SDL.FPoint { X = tile.TexX + texWidth, Y = tile.TexY + texHeight};
+                _vertices[baseIndex + 3].TexCoord = new SDL.FPoint { X = tile.TexX,            Y = tile.TexY + texHeight};
 
                 drawnTiles++;
             }

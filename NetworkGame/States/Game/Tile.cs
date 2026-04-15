@@ -18,7 +18,9 @@ public class Tile
         Texture = texture;
         Brightness = brightness;
 
-        TexX = texture.SourceRectangle.X / 32f;
-        TexY = texture.SourceRectangle.Y / 32f;
+        Texture2D textureAtlas = AssetManager.GetTexture("TextureAtlas");
+
+        TexX = texture.SourceRectangle.X / (float)textureAtlas.Width;
+        TexY = texture.SourceRectangle.Y / (float)textureAtlas.Height;
     }
 }

@@ -49,14 +49,16 @@ public class App : Application
         AssetManager.LoadTexture("TextureAtlas.png", _renderer);
         AssetManager.AddTextureRegion("HostCrown", new TextureRegion("TextureAtlas", 0, 0, 19, 15));
         AssetManager.AddTextureRegion("Grass", new TextureRegion("TextureAtlas", 0, 16, 16, 16));
+        AssetManager.AddTextureRegion("CoalTile", new TextureRegion("TextureAtlas", 16, 16, 16, 16));
+        AssetManager.AddTextureRegion("mogus", new TextureRegion("TextureAtlas", 32, 0, 16, 16));
 
         _renderer.SetVSyncEnabled(false);
     }
 
     public override void Start()
     {
-        SetState(new GamingState(new StateResult { PlayerData = new PlayerData() { Username = "katzi lol", Host = true }, Type = "lobby" }, Random.Shared.Next(100, 5000)));
-        //SetState(new MenuState(null!));
+        //SetState(new GamingState(new StateResult { PlayerData = new PlayerData() { Username = "katzi lol", Host = true, X = 0, Y = 0 }, Type = "lobby" }, Random.Shared.Next(100, 5000)));
+        SetState(new MenuState(null!));
     }
 
     public override void Update(double deltaTime) 

@@ -130,7 +130,7 @@ public class Server
             {
                 switch (packet.Type)
                 {
-                    case "posUpdate":
+                    case "update_pos":
                         PositionUpdatePacket positionUpdatePacket = JsonSerializer.Deserialize<PositionUpdatePacket>(json)!;
                         await BroadCastPacketTcp(positionUpdatePacket);
                         playerClient.PlayerData.X = positionUpdatePacket.X;
@@ -173,7 +173,7 @@ public class Server
 
                         break;
 
-                    case "posUpdate":
+                    case "update_pos":
                         PositionUpdatePacket positionUpdatePacket = JsonSerializer.Deserialize<PositionUpdatePacket>(json)!;  
 
                         if (client != null)
