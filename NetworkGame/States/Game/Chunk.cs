@@ -37,13 +37,15 @@ public class Chunk
         Dirty = false;
     }
 
-    public void PlaceTileAt(Vector2 chunkPosition, Texture2D texture, float brightness)
+    public bool PlaceTileAt(Vector2 chunkPosition, Texture2D texture, float brightness)
     {
         int tileX = (int)MathF.Floor(chunkPosition.X / GamingState.TILE_WIDTH);
         int tileY = (int)MathF.Floor(chunkPosition.Y / GamingState.TILE_HEIGHT);
+        if (_tiles[tileY * CHUNK_WIDHT + tileX] != null) return false;
 
         _tiles[tileY * CHUNK_WIDHT + tileX] = new Tile(tileX * GamingState.TILE_WIDTH, tileY * GamingState.TILE_HEIGHT, texture, brightness);
         Dirty = true;
+        return true;
     }
 
     private void RecalculateVertices()

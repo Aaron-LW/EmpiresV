@@ -31,6 +31,8 @@ public class GamingState : GameState
 
     private List<ITileSystem> _tileSystems = new();
 
+    private Queue<PlaceTilePacket> _placeTileQueue = new();
+
     public GamingState(StateResult previousStateResult, int worldSeed) : base(previousStateResult)
     {
         _playerData = previousStateResult.PlayerData;
@@ -68,6 +70,12 @@ public class GamingState : GameState
         if (movementVector != Vector2.Zero)
         {
             _ = App.SendPacketUdp(new PositionUpdatePacket() { Type = "update_pos", Username = _playerData.Username, X = _playerData.X, Y = _playerData.Y });
+        }
+
+        while (_placeTileQueue.Count > 0)
+        {
+            PlaceTilePacket placeTilePacket = _placeTileQueue.Dequeue();
+            _tileEngine.PlaceTileAt(AssetManager.GetTexture(placeTilePacket.TextureName), new Vector2(placeTilePacket.X, placeTilePacket.Y));
         }
 
         if (InputHandler.ScrollWheelDelta != 0)
@@ -128,7 +136,7 @@ public class GamingState : GameState
 
             case "place_tile":
                 PlaceTilePacket placeTilePacket = JsonSerializer.Deserialize<PlaceTilePacket>(json)!;
-                _tileEngine.PlaceTileAt(AssetManager.GetTexture(placeTilePacket.TextureName), new Vector2(placeTilePacket.X, placeTilePacket.Y));
+                _placeTileQueue.Enqueue(placeTilePacket);
                 break;
         }
 
