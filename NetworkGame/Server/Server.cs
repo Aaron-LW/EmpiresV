@@ -146,6 +146,11 @@ public class Server
                         StartGamePacket startGamePacket = JsonSerializer.Deserialize<StartGamePacket>(json)!;
                         await BroadCastPacketTcp(startGamePacket);
                         break;
+
+                    case "place_tile":
+                        PlaceTilePacket placeTilePacket = JsonSerializer.Deserialize<PlaceTilePacket>(json)!;
+                        await BroadCastPacketTcp(placeTilePacket);
+                        break;
                 }
             }
     }

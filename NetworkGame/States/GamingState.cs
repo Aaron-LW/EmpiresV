@@ -27,34 +27,31 @@ public class GamingState : GameState
     private Vector2 _cameraPosition => new Vector2(_cameraX, _cameraY);
 
     private PlayerData _playerData;
-    private Dictionary<string, PlayerData> _peersData;
+    private Dictionary<string, PlayerData>? _peersData;
+
+    private List<ITileSystem> _tileSystems = new();
 
     public GamingState(StateResult previousStateResult, int worldSeed) : base(previousStateResult)
     {
         _playerData = previousStateResult.PlayerData;
-        _peersData = previousStateResult.PeerData!;
+        _peersData = previousStateResult.PeerData;
 
         _backgroundTileEngine = new(WORLD_WIDTH, WORLD_HEIGHT, 1);
         _backgroundTileEngine.GenerateWorld(worldSeed);
 
         _tileEngine = new(WORLD_WIDTH, WORLD_HEIGHT, 1);
         //_tileEngine.GenerateOres(worldSeed);
+
+        _tileSystems.Add(new CoolnessSystem());
     }
 
     public override void Update(double deltaTime)
     {
         if (_preferredZoom != _zoom)
         {
-            Vector2 beforeZoomMouseWorldPos = (InputHandler.MousePosition / _zoom) + _cameraPosition;
-
             _zoom = MathHelper.Lerp(_zoom, _preferredZoom, 30 * (float)deltaTime);
             _backgroundTileEngine.SetZoom(_zoom);
             _tileEngine.SetZoom(_zoom);
-
-            Vector2 afterZoomMouseWorldPos = (InputHandler.MousePosition / _zoom) + _cameraPosition;
-
-            //_cameraX += beforeZoomMouseWorldPos.X - afterZoomMouseWorldPos.X;
-            //_cameraY += beforeZoomMouseWorldPos.Y - afterZoomMouseWorldPos.Y;
         }
 
         Vector2 movementVector = new();
@@ -86,9 +83,19 @@ public class GamingState : GameState
 
         if (InputHandler.IsLeftMousePressed())
         {
-            _tileEngine.PlaceTileAt(AssetManager.GetTexture("CoalTile"), InputHandler.MousePosition / _zoom + _cameraPosition);
+            Vector2 placePosition = InputHandler.MousePosition / _zoom + _cameraPosition;
+            bool success = _tileEngine.PlaceTileAt(AssetManager.GetTexture("CoalTile"), placePosition);
+
+            if (success)
+            {
+                _ = App.SendPacketTcp(new PlaceTilePacket() { Type = "place_tile", Username = _playerData.Username, TextureName = "CoalTile", X = placePosition.X, Y = placePosition.Y });
+            }
         }
 
+        foreach (ITileSystem tileSystem in _tileSystems)
+        {
+            tileSystem.Update(_tileEngine.ComponentManager, deltaTime);
+        }
     }
 
     public override void Render(Renderer renderer)
@@ -100,9 +107,12 @@ public class GamingState : GameState
 
         renderer.RenderTexture(AssetManager.GetTexture("mogus"), (_playerData.Position - _cameraPosition) * _zoom, Color.White, _zoom);
 
-        foreach (var peer in _peersData)
+        if (_peersData != null)
         {
-            renderer.RenderTexture(AssetManager.GetTexture("mogus"), (peer.Value.Position - _cameraPosition) * _zoom, Color.White, _zoom);
+            foreach (var peer in _peersData)
+            {
+                renderer.RenderTexture(AssetManager.GetTexture("mogus"), (peer.Value.Position - _cameraPosition) * _zoom, Color.White, _zoom);
+            }
         }
     }
 
@@ -112,8 +122,13 @@ public class GamingState : GameState
         {
             case "update_pos":
                 PositionUpdatePacket positionUpdatePacket = JsonSerializer.Deserialize<PositionUpdatePacket>(json)!;
-                _peersData[positionUpdatePacket.Username].X = positionUpdatePacket.X;
-                _peersData[positionUpdatePacket.Username].Y = positionUpdatePacket.Y;
+                _peersData![positionUpdatePacket.Username].X = positionUpdatePacket.X;
+                _peersData![positionUpdatePacket.Username].Y = positionUpdatePacket.Y;
+                break;
+
+            case "place_tile":
+                PlaceTilePacket placeTilePacket = JsonSerializer.Deserialize<PlaceTilePacket>(json)!;
+                _tileEngine.PlaceTileAt(AssetManager.GetTexture(placeTilePacket.TextureName), new Vector2(placeTilePacket.X, placeTilePacket.Y));
                 break;
         }
 

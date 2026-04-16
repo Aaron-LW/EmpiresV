@@ -12,6 +12,8 @@ public class TileEngine
 
     private Dictionary<Vector2, Chunk> _chunks = new();
 
+    public ComponentManager ComponentManager { get; private set; } = new();
+
     public TileEngine(int mapWidth, int mapHeight, float baseZoom)
     {
         _zoom = baseZoom;
@@ -97,7 +99,7 @@ public class TileEngine
         _zoom = newZoom;
     }
 
-    public void PlaceTileAt(Texture2D texture, Vector2 worldPosition)
+    public bool PlaceTileAt(Texture2D texture, Vector2 worldPosition)
     {
         Chunk chunk = GetOrCreateChunk(worldPosition);
 
@@ -105,6 +107,8 @@ public class TileEngine
         float chunkY = worldPosition.Y % Chunk.CHUNK_PIXEL_HEIGHT;
 
         chunk.PlaceTileAt(new Vector2(chunkX, chunkY), texture, 1f);
+        ComponentManager.AddComponent(new CoolComponent() { Coolness = Random.Shared.Next(0, 255) }, AlignToGrid(worldPosition));
+        return true;
     }
 
     private Vector2 AlignToGrid(Vector2 worldPosition)
