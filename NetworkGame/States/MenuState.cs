@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Numerics;
+using System.Text.Json;
 using SDL3;
 using Smash.Graphics;
 using Smash.Input;
@@ -18,6 +19,14 @@ public class MenuState : GameState
 
     public MenuState(StateResult previousStateResult) : base(previousStateResult)
     {
+        string username = "";
+
+        string dataFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EmpiresV", "data.json");
+        if (File.Exists(dataFile))
+        {
+            username = JsonSerializer.Deserialize<string>(File.ReadAllText(dataFile))!;
+        }
+
         _usernameField = new InputField()
         {
             X = 150,
@@ -26,6 +35,7 @@ public class MenuState : GameState
             Height = 50,
             BackgroundColor = Color.FromArgb(35, 35, 35),
             TextColor = Color.White,
+            Text = username,
             RequireInput = true
         };
 
@@ -108,7 +118,10 @@ public class MenuState : GameState
             foreach (InputField inputField in _inputFields)
             {
                 if (inputField.Selected)
+                {
                     inputField.SendTextInput(InputHandler.TextInput);
+                    File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EmpiresV", "data.json"), JsonSerializer.Serialize(_usernameField.Text!));
+                }
             }
         }
 
@@ -117,7 +130,10 @@ public class MenuState : GameState
             foreach (InputField inputField in _inputFields)
             {
                 if (inputField.Selected)
+                {
                     inputField.SendTextInput("Backspace");
+                    File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EmpiresV", "data.json"), JsonSerializer.Serialize(_usernameField.Text!));
+                }
             }
         }
 

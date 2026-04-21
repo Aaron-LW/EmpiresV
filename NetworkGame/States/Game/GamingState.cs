@@ -11,8 +11,8 @@ public class GamingState : GameState
     public const int TILE_WIDTH = 16;
     public const int TILE_HEIGHT = 16;
 
-    private const int WORLD_WIDTH = 1600;
-    private const int WORLD_HEIGHT = 1600;
+    private const int WORLD_WIDTH = 800;
+    private const int WORLD_HEIGHT = 800;
 
     private const int CAMERA_SPEED = 2000;
 
@@ -20,7 +20,6 @@ public class GamingState : GameState
     private float _preferredZoom = 1;
 
     private TileEngine _backgroundTileEngine;
-    private TileEngine _tileEngine;
 
     private float _cameraX;
     private float _cameraY;
@@ -29,9 +28,10 @@ public class GamingState : GameState
     private PlayerData _playerData;
     private Dictionary<string, PlayerData>? _peersData;
 
-    private List<ITileSystem> _tileSystems = new();
+    private List<Entity> _entities = new();
 
-    private Queue<PlaceTilePacket> _placeTileQueue = new();
+    private ComponentManager _componentManager = new();
+    private List<ISystem> _systems = new();
 
     public GamingState(StateResult previousStateResult, int worldSeed) : base(previousStateResult)
     {
@@ -41,10 +41,14 @@ public class GamingState : GameState
         _backgroundTileEngine = new(WORLD_WIDTH, WORLD_HEIGHT, 1);
         _backgroundTileEngine.GenerateWorld(worldSeed);
 
-        _tileEngine = new(WORLD_WIDTH, WORLD_HEIGHT, 1);
-        //_tileEngine.GenerateOres(worldSeed);
+        Random random = new Random(worldSeed);
 
-        _tileSystems.Add(new CoolnessSystem());
+        for (int i = 0; i < 50; i++)
+        {
+            _entities.Add(new Entity());
+            _componentManager.AddComponent(i, new TextureComponent(AssetManager.GetTexture("Geyser")) { Scale = 3 });
+            _componentManager.AddComponent(i, new PositionComponent() { X = random.Next(0, WORLD_WIDTH * TILE_WIDTH), Y = random.Next(0, WORLD_HEIGHT * TILE_HEIGHT) });
+        }
     }
 
     public override void Update(double deltaTime)
@@ -53,7 +57,6 @@ public class GamingState : GameState
         {
             _zoom = MathHelper.Lerp(_zoom, _preferredZoom, 30 * (float)deltaTime);
             _backgroundTileEngine.SetZoom(_zoom);
-            _tileEngine.SetZoom(_zoom);
         }
 
         Vector2 movementVector = new();
@@ -72,12 +75,6 @@ public class GamingState : GameState
             _ = App.SendPacketUdp(new PositionUpdatePacket() { Type = "update_pos", Username = _playerData.Username, X = _playerData.X, Y = _playerData.Y });
         }
 
-        while (_placeTileQueue.Count > 0)
-        {
-            PlaceTilePacket placeTilePacket = _placeTileQueue.Dequeue();
-            _tileEngine.PlaceTileAt(AssetManager.GetTexture(placeTilePacket.TextureName), new Vector2(placeTilePacket.X, placeTilePacket.Y));
-        }
-
         if (InputHandler.ScrollWheelDelta != 0)
         {
             _preferredZoom += InputHandler.ScrollWheelDelta / 10;
@@ -88,22 +85,6 @@ public class GamingState : GameState
         {
             _preferredZoom = 1;
         }
-
-        if (InputHandler.IsLeftMousePressed())
-        {
-            Vector2 placePosition = InputHandler.MousePosition / _zoom + _cameraPosition;
-            bool success = _tileEngine.PlaceTileAt(AssetManager.GetTexture("CoalTile"), placePosition);
-
-            if (success)
-            {
-                _ = App.SendPacketTcp(new PlaceTilePacket() { Type = "place_tile", Username = _playerData.Username, TextureName = "CoalTile", X = placePosition.X, Y = placePosition.Y });
-            }
-        }
-
-        foreach (ITileSystem tileSystem in _tileSystems)
-        {
-            tileSystem.Update(_tileEngine.ComponentManager, deltaTime);
-        }
     }
 
     public override void Render(Renderer renderer)
@@ -111,7 +92,17 @@ public class GamingState : GameState
         renderer.Clear(Color.CornflowerBlue);
 
         _backgroundTileEngine.Render(renderer, _cameraPosition);
-        _tileEngine.Render(renderer, _cameraPosition);
+
+        foreach (Entity entity in _entities)
+        {
+            TextureComponent? textureComponent = _componentManager.Query<TextureComponent>(entity.Id);
+            PositionComponent? positionComponent = _componentManager.Query<PositionComponent>(entity.Id);
+
+            if (textureComponent != null && positionComponent != null)
+            {
+                renderer.RenderTexture(textureComponent.Texture, (positionComponent.Position - _cameraPosition) * _zoom, Color.White, textureComponent.Scale * _zoom);
+            }
+        }
 
         renderer.RenderTexture(AssetManager.GetTexture("mogus"), (_playerData.Position - _cameraPosition) * _zoom, Color.White, _zoom);
 
@@ -132,11 +123,6 @@ public class GamingState : GameState
                 PositionUpdatePacket positionUpdatePacket = JsonSerializer.Deserialize<PositionUpdatePacket>(json)!;
                 _peersData![positionUpdatePacket.Username].X = positionUpdatePacket.X;
                 _peersData![positionUpdatePacket.Username].Y = positionUpdatePacket.Y;
-                break;
-
-            case "place_tile":
-                PlaceTilePacket placeTilePacket = JsonSerializer.Deserialize<PlaceTilePacket>(json)!;
-                _placeTileQueue.Enqueue(placeTilePacket);
                 break;
         }
 

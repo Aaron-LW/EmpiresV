@@ -51,14 +51,21 @@ public class App : Application
         AssetManager.AddTextureRegion("Grass", new TextureRegion("TextureAtlas", 0, 16, 16, 16));
         AssetManager.AddTextureRegion("CoalTile", new TextureRegion("TextureAtlas", 16, 16, 16, 16));
         AssetManager.AddTextureRegion("mogus", new TextureRegion("TextureAtlas", 32, 0, 16, 16));
+        AssetManager.AddTextureRegion("Geyser", new TextureRegion("TextureAtlas", 0, 32, 16, 16));
 
         _renderer.SetVSyncEnabled(false);
     }
 
     public override void Start()
     {
-        //SetState(new GamingState(new StateResult { PlayerData = new PlayerData() { Username = "katzi lol", Host = true, X = 0, Y = 0 }, Type = "lobby" }, Random.Shared.Next(100, 5000)));
-        SetState(new MenuState(null!));
+        SetState(new GamingState(new StateResult { PlayerData = new PlayerData() { Username = "katzi lol", Host = true, X = 0, Y = 0 }, Type = "lobby" }, Random.Shared.Next(100, 5000)));
+        //SetState(new MenuState(null!));
+
+        string datafolderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EmpiresV");
+        if (!Directory.Exists(datafolderPath))
+        {
+            Directory.CreateDirectory(datafolderPath);
+        }
     }
 
     public override void Update(double deltaTime) 

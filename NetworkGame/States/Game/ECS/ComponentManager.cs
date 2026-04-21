@@ -4,7 +4,7 @@ public class ComponentManager
 {
     private Dictionary<Type, IComponentStorage> _storages = new();
 
-    public void AddComponent<T>(T component, Vector2 position) where T : TileComponent
+    public void AddComponent<T>(int id, T component) where T : Component
     {
         var type = typeof(T);
 
@@ -13,10 +13,10 @@ public class ComponentManager
             _storages.Add(type, new ComponentStorage<T>());
         }
 
-        ((ComponentStorage<T>)_storages[type]).Add(component, position);
+        ((ComponentStorage<T>)_storages[type]).Add(id, component);
     }
 
-    public T? Query<T>(Vector2 position) where T : TileComponent
+    public T? Query<T>(int id) where T : Component
     {
         var type = typeof(T);
 
@@ -25,13 +25,13 @@ public class ComponentManager
             return null;
         }
 
-        T? tileComponent = ((ComponentStorage<T>)_storages[type]).Get(position);
+        T? tileComponent = ((ComponentStorage<T>)_storages[type]).Get(id);
 
         if (tileComponent != null) return tileComponent;
         return null;
     }
 
-    public IEnumerable<(Vector2 position, T component)> QueryAll<T>() where T : TileComponent
+    public IEnumerable<(int id, T component)> QueryAll<T>() where T : Component
     {
         if (!_storages.TryGetValue(typeof(T), out var storage))
             yield break;
@@ -42,15 +42,15 @@ public class ComponentManager
 
         foreach (var e in all)
         {
-            yield return (e.position, e.component);
+            yield return (e.id, e.component);
         }
     }
 
-    public void RemoveAll(Vector2 position)
+    public void RemoveAll(int id)
     {
         foreach (IComponentStorage storage in _storages.Values)
         {
-            storage.Remove(position);
+            storage.Remove(id);
         }
     }
 }
