@@ -288,7 +288,7 @@ public class App : Application
             _networkStream = networkStream;
             
             _udpClient = new UdpClient(0);
-            _serverEndPoint = new IPEndPoint(IPAddress.Parse(ip), 5001);
+            _serverEndPoint = new IPEndPoint(IPAddress.Parse(ip), 5000);
             SendPacketUdp(new Packet { Type = "udp_init", Username = username }).GetAwaiter();
 
             _ = Task.Run(async () => ReceivePackets(false));

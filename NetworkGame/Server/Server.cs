@@ -21,7 +21,7 @@ public class Server
 
         Console.Write("Starting UDP server...  ");
 
-        _udpServer = new UdpClient(5001);
+        _udpServer = new UdpClient(5000);
         _ = HandleUdp();
 
         Console.WriteLine("Success!");

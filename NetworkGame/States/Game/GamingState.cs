@@ -14,7 +14,7 @@ public class GamingState : GameState
     private const int WORLD_WIDTH = 800;
     private const int WORLD_HEIGHT = 800;
 
-    private const int CAMERA_SPEED = 2000;
+    private const int CAMERA_SPEED = 1000;
 
     private float _zoom = 1;
     private float _preferredZoom = 1;
@@ -40,15 +40,6 @@ public class GamingState : GameState
 
         _backgroundTileEngine = new(WORLD_WIDTH, WORLD_HEIGHT, 1);
         _backgroundTileEngine.GenerateWorld(worldSeed);
-
-        Random random = new Random(worldSeed);
-
-        for (int i = 0; i < 50; i++)
-        {
-            _entities.Add(new Entity());
-            _componentManager.AddComponent(i, new TextureComponent(AssetManager.GetTexture("Geyser")) { Scale = 3 });
-            _componentManager.AddComponent(i, new PositionComponent() { X = random.Next(0, WORLD_WIDTH * TILE_WIDTH), Y = random.Next(0, WORLD_HEIGHT * TILE_HEIGHT) });
-        }
     }
 
     public override void Update(double deltaTime)
@@ -67,6 +58,7 @@ public class GamingState : GameState
         _playerData.X += movementVector.X * CAMERA_SPEED * (float)deltaTime;
         _playerData.Y += movementVector.Y * CAMERA_SPEED * (float)deltaTime;
 
+        Texture2D playerTexture = AssetManager.GetTexture("mogus");
         _cameraX = _playerData.X - (App.WindowWidth / 2 / _zoom);
         _cameraY = _playerData.Y - (App.WindowHeight / 2 / _zoom);
 
