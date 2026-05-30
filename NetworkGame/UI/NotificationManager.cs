@@ -1,7 +1,5 @@
-using Color = System.Drawing.Color;
 using Smash;
 using Smash.Graphics;
-using System.Numerics;
 
 public static class NotificationManager
 {

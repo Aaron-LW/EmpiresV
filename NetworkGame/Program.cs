@@ -12,8 +12,8 @@ internal static class Program
             Server server = new Server();
             Task.Run(async () => server.Main());
 
-            while (true) { }
-        }
+            while (true) {}}
+        
         else
         {
             Console.WriteLine("Running as client");
@@ -30,11 +30,14 @@ internal static class Program
 
                 application.Update(SmashEngine.DeltaTime);
                 application.Render();
-            }
+            };
 
-            application.End(); 
+            application.End();
             SmashEngine.Stop();
         }
-
     }
-}
+};
+        
+
+    
+

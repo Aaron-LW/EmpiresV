@@ -53,7 +53,7 @@ public class App : Application
         AssetManager.AddTextureRegion("mogus", new TextureRegion("TextureAtlas", 32, 0, 16, 16));
         AssetManager.AddTextureRegion("Geyser", new TextureRegion("TextureAtlas", 0, 32, 16, 16));
 
-        _renderer.SetVSyncEnabled(false);
+        _renderer.SetVSyncEnabled(true);
     }
 
     public override void Start()

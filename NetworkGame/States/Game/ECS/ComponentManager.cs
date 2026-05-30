@@ -1,5 +1,3 @@
-using System.Numerics;
-
 public class ComponentManager
 {
     private Dictionary<Type, IComponentStorage> _storages = new();

@@ -1,4 +1,3 @@
-using System.Drawing;
 using System.Numerics;
 
 public class Notification
