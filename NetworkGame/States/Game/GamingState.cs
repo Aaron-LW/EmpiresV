@@ -59,8 +59,8 @@ public class GamingState : GameState
         _playerData.Y += movementVector.Y * CAMERA_SPEED * (float)deltaTime;
 
         Texture2D playerTexture = AssetManager.GetTexture("mogus");
-        _cameraX = _playerData.X - (App.WindowWidth / 2 / _zoom);
-        _cameraY = _playerData.Y - (App.WindowHeight / 2 / _zoom);
+        _cameraX = _playerData.X - (App.WindowWidth / 2 / _zoom) + (playerTexture.Width / 2);
+        _cameraY = _playerData.Y - (App.WindowHeight / 2 / _zoom) + (playerTexture.Height / 2);
 
         if (movementVector != Vector2.Zero)
         {
