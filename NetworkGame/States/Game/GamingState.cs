@@ -47,10 +47,13 @@ public class GamingState : GameState
     public override void Update(double deltaTime)
     {
         _elapsedTime += (float)deltaTime;
-        if (_elapsedTime > 0.05f)
+        if (Program.TCPOnly)
         {
-            _ = App.SendPacketTcp(new PositionUpdatePacket() { Type = "update_pos", Username = _playerData.Username, X = _playerData.X, Y = _playerData.Y });
-            _elapsedTime = 0;
+            if (_elapsedTime > 0.05f)
+            {
+                _ = App.SendPacketTcp(new PositionUpdatePacket() { Type = "update_pos", Username = _playerData.Username, X = _playerData.X, Y = _playerData.Y });
+                _elapsedTime = 0;
+            }
         }
 
         if (_preferredZoom != _zoom)
@@ -70,6 +73,11 @@ public class GamingState : GameState
         Texture2D playerTexture = AssetManager.GetTexture("mogus");
         _cameraX = _playerData.X - (App.WindowWidth / 2 / _zoom) + (playerTexture.Width / 2);
         _cameraY = _playerData.Y - (App.WindowHeight / 2 / _zoom) + (playerTexture.Height / 2);
+
+        if (!Program.TCPOnly && movementVector != Vector2.Zero)
+        {
+            _ = App.SendPacketUdp(new PositionUpdatePacket() { Type = "update_pos", Username = _playerData.Username, X = _playerData.X, Y = _playerData.Y });
+        }
 
         if (InputHandler.ScrollWheelDelta != 0)
         {

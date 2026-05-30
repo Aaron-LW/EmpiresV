@@ -55,6 +55,12 @@ public class InputField
             return;
         }
 
+        if (input == "BackspaceAll" && Text != null)
+        {
+            Text = "";
+            return;
+        }
+
         Text += input;
     }
 

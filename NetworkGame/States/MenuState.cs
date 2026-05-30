@@ -131,8 +131,19 @@ public class MenuState : GameState
             {
                 if (inputField.Selected)
                 {
-                    inputField.SendTextInput("Backspace");
+                    inputField.SendTextInput(InputHandler.IsKeyDown(SDL.Keycode.LCtrl) ? "BackspaceAll" : "Backspace");
                     File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EmpiresV", "data.json"), JsonSerializer.Serialize(_usernameField.Text!));
+                }
+            }
+        }
+
+        if (InputHandler.IsKeyDown(SDL.Keycode.LCtrl))
+        {
+            if (InputHandler.IsKeyPressed(SDL.Keycode.V))
+            {
+                foreach (InputField inputField in _inputFields)
+                {
+                    inputField.Text += SDL.GetClipboardText();
                 }
             }
         }

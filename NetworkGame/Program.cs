@@ -1,11 +1,20 @@
+using System.Dynamic;
 using Smash;
 using Smash.Input;
 
 internal static class Program
 {
+    public static bool TCPOnly { get; private set; } = false;
+
     private static void Main(string[] args)
     {
-        if (args.Length == 1 && args[0] == "--server")
+        if (args.Contains("--tcp-only"))
+        {
+            TCPOnly = true;
+            Console.WriteLine("Enabling TCP-only mode");
+        }
+
+        if (args.Contains("--server"))
         {
             Console.WriteLine("Running as server");
 
