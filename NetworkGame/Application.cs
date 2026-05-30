@@ -58,8 +58,8 @@ public class App : Application
 
     public override void Start()
     {
-        SetState(new GamingState(new StateResult { PlayerData = new PlayerData() { Username = "katzi lol", Host = true, X = 0, Y = 0 }, Type = "lobby" }, Random.Shared.Next(100, 5000)));
-        //SetState(new MenuState(null!));
+        //SetState(new GamingState(new StateResult { PlayerData = new PlayerData() { Username = "katzi lol", Host = true, X = 0, Y = 0 }, Type = "lobby" }, Random.Shared.Next(100, 5000)));
+        SetState(new MenuState(null!));
 
         string datafolderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EmpiresV");
         if (!Directory.Exists(datafolderPath))
@@ -122,7 +122,7 @@ public class App : Application
                         StartInfo = new ProcessStartInfo()
                         {
                             FileName = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "NetworkGame"),
-                            Arguments = "server start lol",
+                            Arguments = "--server",
                             RedirectStandardOutput = true,
                             UseShellExecute = false
                         },
@@ -144,14 +144,20 @@ public class App : Application
                                 Console.WriteLine("Server has started!");
                                 startedServer = true;
 
-                                string? localIp = GetLocalIp();
-                                if (localIp != null)
+
+                                (bool success, bool host) = TryConnect(menuStateResult.PlayerData.Username, menuStateResult.Ip);
+                                Console.WriteLine($"Server Ip: {GetLocalIp()}");
+
+                                if (!success)
                                 {
-                                    Console.WriteLine($"Server Ip: {localIp}");
+                                    _serverProcess.Kill();
+                                    return;
                                 }
 
-                                TryConnect(menuStateResult.PlayerData.Username, menuStateResult.Ip, true);
-                                SetState(new LobbyState(menuStateResult));
+                                Console.WriteLine($"Host: {host}");
+
+                                menuStateResult.PlayerData.Host = host;
+                                SetState(new LobbyState(menuStateResult, GetLocalIp()!));
                             }
                         }
                     };
@@ -159,25 +165,19 @@ public class App : Application
                 }
                 else
                 {
-                    Console.WriteLine($"Username: {menuStateResult.PlayerData.Username}");
-                    Console.WriteLine($"Ip: {menuStateResult.Ip}");
+                    (bool connected, bool host) = TryConnect(menuStateResult.PlayerData.Username, menuStateResult.Ip);
 
-                    string? localIp = GetLocalIp();
-                    if (localIp != null)
-                    {
-                        Console.WriteLine($"Server Ip: {localIp}");
-                    }
-
-                    bool connected = TryConnect(menuStateResult.PlayerData.Username, menuStateResult.Ip);
+                    Console.WriteLine($"Host: {host}");
 
                     if (connected)
                     {
                         Console.WriteLine("Connected to Server!");
-                        SetState(new LobbyState(menuStateResult));
+
+                        menuStateResult.PlayerData.Host = host;
+                        SetState(new LobbyState(menuStateResult, _serverEndPoint!.Address.ToString()));
                     }
                     else
                     {
-                        Console.WriteLine("Couldn't connect to Server");
                         SetState(new MenuState(new StateResult { PlayerData = null!, Type = "none"}));
                     }
                 }
@@ -253,40 +253,48 @@ public class App : Application
         await _udpClient.SendAsync(data, data.Length, _serverEndPoint);
     }
 
-    private bool TryConnect(string username, string ip, bool host = false)
+    //(Could connect, is host)
+    private (bool, bool) TryConnect(string username, string ip)
     {
         Console.WriteLine("Trying to connect as " + username);
 
         TcpClient tcpClient = new TcpClient(ip, 5000);
         NetworkStream networkStream = tcpClient.GetStream();
 
-        networkStream.Write(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new LoginPacket { Type = "login", Username = username, Host = host })));
+        networkStream.Write(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new LoginPacket { Type = "login", Username = username })));
 
-        byte[] connectionBuffer = new byte[1024];
+        byte[] connectionBuffer = new byte[2];
         int bytesRead = networkStream.Read(connectionBuffer);
 
-        string connectionResponse = Encoding.UTF8.GetString(connectionBuffer, 0, bytesRead);
-
-        if (connectionResponse == "Forbidden")
+        if (connectionBuffer[0] != 00000000)
         {
+            Console.Write("Couldn't connect to server: ");
+
+            switch (connectionBuffer[0])
+            {
+                case 00000001:
+                    Console.WriteLine("User with the same name already exists");
+                    break;
+            }
+
             networkStream.Close();
             tcpClient.Close();
-            return false;
+            return (false, false);
         }
         else
         {
+            bool host = connectionBuffer[1] == 00000001;
+
             _networkStream = networkStream;
             
             _udpClient = new UdpClient(0);
             _serverEndPoint = new IPEndPoint(IPAddress.Parse(ip), 5001);
             SendPacketUdp(new Packet { Type = "udp_init", Username = username }).GetAwaiter();
 
-            //_stateMachine.SetConnectionData(_networkStream, _udpClient, _serverEndPoint);
-
             _ = Task.Run(async () => ReceivePackets(false));
             _ = Task.Run(async () => ReceivePackets(true));
 
-            return true;
+            return (true, host);
         }
     }
 

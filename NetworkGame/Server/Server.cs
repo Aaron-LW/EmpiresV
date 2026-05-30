@@ -38,25 +38,28 @@ public class Server
             LoginPacket? loginRequestPacket = JsonSerializer.Deserialize<LoginPacket>(Encoding.UTF8.GetString(buffer, 0, bytesRead));
             if (loginRequestPacket == null) throw new Exception("Login request packet was null D:");
 
+            bool host = _clients.Count == 0;
+
             if (_clients.Any(c => c.Username == loginRequestPacket.Username))
             {
                 Console.WriteLine($"Denying client because username {loginRequestPacket.Username} has already been taken");
 
-                await clientStream.WriteAsync(Encoding.UTF8.GetBytes("Forbidden"));
+                await clientStream.WriteAsync(new ReadOnlyMemory<byte>([00000001]));
                 client.Close();
                 continue;
             }
             else
             {
-                await clientStream.WriteAsync(Encoding.UTF8.GetBytes("Ok"));
+                await clientStream.WriteAsync(new ReadOnlyMemory<byte>([00000000, host ? (byte)00000001 : (byte)00000000]));
             }
+
 
             PlayerClient playerClient = new PlayerClient()
             {
                 TcpClient = client,
                 Username = loginRequestPacket.Username,
-                PlayerData = new() { Host = loginRequestPacket.Host, Username = loginRequestPacket.Username },
-                Host = loginRequestPacket.Host
+                PlayerData = new() { Host = host, Username = loginRequestPacket.Username },
+                Host = host
             };
 
             lock (_lock)
@@ -65,7 +68,7 @@ public class Server
             }
 
             await Task.Run(async () => BroadCastPacketTcp(new JoinPacket { Type = "join", Username = loginRequestPacket.Username, NewJoin = true}));
-            Console.WriteLine($"{loginRequestPacket.Username} has joined the server " + (loginRequestPacket.Host ? "as host" : ""));
+            Console.WriteLine($"{loginRequestPacket.Username} has joined the server " + (host ? "as host" : ""));
             _ = HandleClientTcp(playerClient);
         }
     }

@@ -13,6 +13,8 @@ public class LobbyState : GameState
     private string? _localIp;
     private Texture2D _hostCrown;
 
+    private readonly string _serverIp;
+
     private PlayerData _userPlayerData;
     private Dictionary<string, PlayerData> _playerData = new();
     private readonly object _playerDataLock = new();
@@ -26,8 +28,10 @@ public class LobbyState : GameState
 
     private Button? _startGameButton;
 
-    public LobbyState(StateResult previousStateResult) : base(previousStateResult)
+    public LobbyState(StateResult previousStateResult, string serverIp) : base(previousStateResult)
     {
+        _serverIp = serverIp;
+
         _localIp = GetLocalIp();
         _hostCrown = AssetManager.GetTexture("HostCrown");
 
@@ -127,7 +131,7 @@ public class LobbyState : GameState
         renderer.Clear(Color.FromArgb(20, 20, 20));
 
         renderer.RenderText(App.Font, "Lobby", new Vector2(20), Color.White);
-        renderer.RenderText(App.Font, $"Ip: {_localIp}", new Vector2(App.Font.MeasureString("Lobby").X + 40, 20), Color.White);
+        //renderer.RenderText(App.Font, $"Server Ip: {_serverIp}", new Vector2(App.Font.MeasureString("Lobby").X + 40, 20), Color.White);
 
         List<PlayerData> playerData;
         lock (_playerDataLock)
