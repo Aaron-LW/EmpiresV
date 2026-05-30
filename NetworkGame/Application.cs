@@ -55,9 +55,17 @@ public class App : Application
 
         _renderer.SetVSyncEnabled(true);
 
+        string dataFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EmpiresV", "data.json");
+        string? username = null;
+
+        if (File.Exists(dataFile))
+        {
+            username = JsonSerializer.Deserialize<string>(File.ReadAllText(dataFile))!;
+        }
+
         if (autoconnect)
         {
-            SetState(new GamingState(new StateResult { PlayerData = new PlayerData() { Username = "katzi lol", Host = true, X = 0, Y = 0 }, Type = "lobby" }, Random.Shared.Next(100, 5000)));
+            SetState(new GamingState(new StateResult { PlayerData = new PlayerData() { Username = username ?? "Default name", Host = true, X = 0, Y = 0 }, Type = "lobby" }, Random.Shared.Next(100, 5000)));
         }
         else
         {
@@ -72,23 +80,14 @@ public class App : Application
 
         if (autohost)
         {
-            string dataFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EmpiresV", "data.json");
-            string? username = null;
-
-            if (File.Exists(dataFile))
+            HostServer(new MenuStateResult()
             {
-                username = JsonSerializer.Deserialize<string>(File.ReadAllText(dataFile))!;
-            }
-
-            OnStateFinish(this, new StateFinishEventArgs()
-            {
-                StateResult = new MenuStateResult()
-                {
-                    PlayerData = new PlayerData() { Username = username ?? "Default name", Host = true },
-                    Type = "menu",
-                    Ip = "127.0.0.1"
-                }
+                PlayerData = new PlayerData() { Username = username ?? "Default name", Host = true},
+                Type = "menu",
+                Ip = "127.0.0.1"
             });
+
+            //SetState(new GamingState(new StateResult { PlayerData = new PlayerData() { Username = username ?? "Default name", Host = true, X = 0, Y = 0 }, Type = "lobby" }, Random.Shared.Next(100, 5000)));
         }
     }
 
@@ -139,53 +138,7 @@ public class App : Application
             {
                 if (menuStateResult.PlayerData.Host)
                 {
-                    Console.WriteLine("Starting server...");
-
-                    _serverProcess = new Process()
-                    {
-                        StartInfo = new ProcessStartInfo()
-                        {
-                            FileName = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "NetworkGame"),
-                            Arguments = "--server",
-                            RedirectStandardOutput = true,
-                            UseShellExecute = false
-                        },
-                    };
-                    _serverProcess.Start();
-                    menuStateResult.Ip = "127.0.0.1";
-
-                    _serverProcess.BeginOutputReadLine();
-                    _serverProcess.OutputDataReceived += async (sender, e) =>
-                    {
-                        bool startedServer = false;                        
-
-                        if (e.Data != null)
-                        {
-                            Console.WriteLine("[SERVER] " + e.Data);
-
-                            if (e.Data.Contains("SERVER_READY") && !startedServer)
-                            {
-                                Console.WriteLine("Server has started!");
-                                startedServer = true;
-
-
-                                (bool success, bool host) = TryConnect(menuStateResult.PlayerData.Username, menuStateResult.Ip);
-                                Console.WriteLine($"Server Ip: {GetLocalIp()}");
-
-                                if (!success)
-                                {
-                                    _serverProcess.Kill();
-                                    return;
-                                }
-
-                                Console.WriteLine($"Host: {host}");
-
-                                menuStateResult.PlayerData.Host = host;
-                                SetState(new LobbyState(menuStateResult, GetLocalIp()!));
-                            }
-                        }
-                    };
-
+                    HostServer(menuStateResult);
                 }
                 else
                 {
@@ -229,6 +182,56 @@ public class App : Application
     {
         _currentState = newState;
         _currentState.StateFinish += OnStateFinish;
+    }
+
+    private void HostServer(MenuStateResult menuStateResult)
+    {
+        Console.WriteLine("Starting server...");
+
+        _serverProcess = new Process()
+        {
+            StartInfo = new ProcessStartInfo()
+            {
+                FileName = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "NetworkGame"),
+                Arguments = "--server",
+                RedirectStandardOutput = true,
+                UseShellExecute = false
+            },
+        };
+        _serverProcess.Start();
+        menuStateResult.Ip = "127.0.0.1";
+
+        _serverProcess.BeginOutputReadLine();
+        _serverProcess.OutputDataReceived += async (sender, e) =>
+        {
+            bool startedServer = false;                        
+
+            if (e.Data != null)
+            {
+                Console.WriteLine("[SERVER] " + e.Data);
+
+                if (e.Data.Contains("SERVER_READY") && !startedServer)
+                {
+                    Console.WriteLine("Server has started!");
+                    startedServer = true;
+
+
+                    (bool success, bool host) = TryConnect(menuStateResult.PlayerData.Username, menuStateResult.Ip);
+                    Console.WriteLine($"Server Ip: {GetLocalIp()}");
+
+                    if (!success)
+                    {
+                        _serverProcess.Kill();
+                        return;
+                    }
+
+                    Console.WriteLine($"Host: {host}");
+
+                    menuStateResult.PlayerData.Host = host;
+                    SetState(new LobbyState(menuStateResult, GetLocalIp()!));
+                }
+            }
+        };
     }
 
 

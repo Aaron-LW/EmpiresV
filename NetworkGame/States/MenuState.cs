@@ -89,7 +89,11 @@ public class MenuState : GameState
 
             if (_connectButton.Rectangle.IsPositionInRectangle(InputHandler.MousePosition))
             {
-                if (_usernameField.Text != string.Empty && _usernameField.Text != null &&  _ipField.Text != string.Empty && _ipField.Text != null)
+                if (_ipField.Text == string.Empty || _ipField.Text == null)
+                {
+                    OnStateFinish(new MenuStateResult() { Ip = "127.0.0.1", Type = "menu", PlayerData = new() { Username = _usernameField.Text!, Host = _hostServer } });
+                }
+                else if (_usernameField.Text != string.Empty && _usernameField.Text != null)
                 {
                     OnStateFinish(new MenuStateResult() { Ip = _ipField.Text, Type = "menu", PlayerData = new() { Username = _usernameField.Text, Host = _hostServer } });
                 }
