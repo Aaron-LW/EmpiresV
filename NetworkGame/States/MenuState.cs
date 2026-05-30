@@ -143,7 +143,10 @@ public class MenuState : GameState
             {
                 foreach (InputField inputField in _inputFields)
                 {
-                    inputField.Text += SDL.GetClipboardText();
+                    if (inputField.Selected)
+                    {
+                        inputField.Text += SDL.GetClipboardText();
+                    }
                 }
             }
         }
