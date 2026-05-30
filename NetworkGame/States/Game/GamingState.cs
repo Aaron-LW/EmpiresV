@@ -33,8 +33,6 @@ public class GamingState : GameState
     private ComponentManager _componentManager = new();
     private List<ISystem> _systems = new();
 
-    private float _elapsedTime;
-
     public GamingState(StateResult previousStateResult, int worldSeed) : base(previousStateResult)
     {
         _playerData = previousStateResult.PlayerData;
@@ -46,16 +44,6 @@ public class GamingState : GameState
 
     public override void Update(double deltaTime)
     {
-        _elapsedTime += (float)deltaTime;
-        if (Program.TCPOnly)
-        {
-            if (_elapsedTime > 0.05f)
-            {
-                _ = App.SendPacketTcp(new PositionUpdatePacket() { Type = "update_pos", Username = _playerData.Username, X = _playerData.X, Y = _playerData.Y });
-                _elapsedTime = 0;
-            }
-        }
-
         if (_preferredZoom != _zoom)
         {
             _zoom = MathHelper.Lerp(_zoom, _preferredZoom, 30 * (float)deltaTime);
@@ -74,9 +62,12 @@ public class GamingState : GameState
         _cameraX = _playerData.X - (App.WindowWidth / 2 / _zoom) + (playerTexture.Width / 2);
         _cameraY = _playerData.Y - (App.WindowHeight / 2 / _zoom) + (playerTexture.Height / 2);
 
-        if (!Program.TCPOnly && movementVector != Vector2.Zero)
+        if (movementVector != Vector2.Zero)
         {
-            _ = App.SendPacketUdp(new PositionUpdatePacket() { Type = "update_pos", Username = _playerData.Username, X = _playerData.X, Y = _playerData.Y });
+            if (Program.TCPOnly)
+                _ = App.SendPacketTcp(new PositionUpdatePacket() { Type = "update_pos", Username = _playerData.Username, X = _playerData.X, Y = _playerData.Y });
+            else
+                _ = App.SendPacketUdp(new PositionUpdatePacket() { Type = "update_pos", Username = _playerData.Username, X = _playerData.X, Y = _playerData.Y });
         }
 
         if (InputHandler.ScrollWheelDelta != 0)

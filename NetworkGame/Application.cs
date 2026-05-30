@@ -28,11 +28,11 @@ public class App : Application
     private Process? _serverProcess;
 
     private float _elapsedTime;
-    private float _fps;
+    private double _fps;
 
     private IState? _currentState;
 
-    public App() 
+    public App(bool autoconnect, bool autohost)
     {
         CreateWindowAndRenderer("Networkgame", 1080, 800, out _window, out _renderer);
         _window.SetWindowResizable(true);
@@ -54,27 +54,51 @@ public class App : Application
         AssetManager.AddTextureRegion("Geyser", new TextureRegion("TextureAtlas", 0, 32, 16, 16));
 
         _renderer.SetVSyncEnabled(true);
-    }
 
-    public override void Start()
-    {
-        //SetState(new GamingState(new StateResult { PlayerData = new PlayerData() { Username = "katzi lol", Host = true, X = 0, Y = 0 }, Type = "lobby" }, Random.Shared.Next(100, 5000)));
-        SetState(new MenuState(null!));
+        if (autoconnect)
+        {
+            SetState(new GamingState(new StateResult { PlayerData = new PlayerData() { Username = "katzi lol", Host = true, X = 0, Y = 0 }, Type = "lobby" }, Random.Shared.Next(100, 5000)));
+        }
+        else
+        {
+            SetState(new MenuState(null!));
+        }
 
         string datafolderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EmpiresV");
         if (!Directory.Exists(datafolderPath))
         {
             Directory.CreateDirectory(datafolderPath);
         }
+
+        if (autohost)
+        {
+            string dataFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EmpiresV", "data.json");
+            string? username = null;
+
+            if (File.Exists(dataFile))
+            {
+                username = JsonSerializer.Deserialize<string>(File.ReadAllText(dataFile))!;
+            }
+
+            OnStateFinish(this, new StateFinishEventArgs()
+            {
+                StateResult = new MenuStateResult()
+                {
+                    PlayerData = new PlayerData() { Username = username ?? "Default name", Host = true },
+                    Type = "menu",
+                    Ip = "127.0.0.1"
+                }
+            });
+        }
     }
 
     public override void Update(double deltaTime) 
     {
         _elapsedTime += (float)deltaTime;
-        if (_elapsedTime > 0.3f)
+        if (_elapsedTime >= 1f)
         {
+            _fps = 1f / deltaTime;
             _elapsedTime = 0;
-            _fps = 1 / (float)deltaTime;
         }
 
         _currentState?.Update(deltaTime);
@@ -91,7 +115,7 @@ public class App : Application
         _currentState?.Render(_renderer);
         NotificationManager.Render(_renderer);
 
-        _renderer.RenderText(Font, $"Fps: {_fps}", new Vector2(WindowWidth - Font.MeasureString($"Fps: {_fps}").X - 20, 20), Color.White);
+        _renderer.RenderText(Font, $"Fps: {(int)_fps}", new Vector2(WindowWidth - Font.MeasureString($"Fps: {(int)_fps}").X - 20, 20), Color.White);
 
         _renderer.RenderPresent();
     }

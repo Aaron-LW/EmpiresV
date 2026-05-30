@@ -8,13 +8,13 @@ internal static class Program
 
     private static void Main(string[] args)
     {
-        if (args.Contains("--tcp-only"))
+        if (args.Contains("--tcp-only") || args.Contains("-to"))
         {
             TCPOnly = true;
             Console.WriteLine("Enabling TCP-only mode");
         }
 
-        if (args.Contains("--server"))
+        if (args.Contains("--server") || args.Contains("-s"))
         {
             Console.WriteLine("Running as server");
 
@@ -30,7 +30,7 @@ internal static class Program
             SmashEngine.Init();
             InputHandler.StartPollingTextInput();
 
-            App application = new App();
+            App application = new App(args.Contains("--game") || args.Contains("-g"), args.Contains("--host") || args.Contains("-h"));
             application.Start();
 
             while (!application.ApplicationShouldClose())
