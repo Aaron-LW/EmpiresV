@@ -1,3 +1,4 @@
+using System.IO.Pipelines;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -137,7 +138,7 @@ public class Server
         }
     }
 
-    private async Task HandlePacket(string json, PlayerClient playerClient)
+    private async Task HandlePacket(string json, PlayerClient playerClient, UdpReceiveResult? udpReceiveResult = null)
     {
         Packet? packet = JsonSerializer.Deserialize<Packet>(json);
 
@@ -172,6 +173,15 @@ public class Server
                         PlaceTilePacket placeTilePacket = JsonSerializer.Deserialize<PlaceTilePacket>(json)!;
                         await BroadCastPacketTcp(placeTilePacket);
                         break;
+
+                    case "udp_init":
+                        if (udpReceiveResult != null)
+                        {
+                            playerClient.UdpEndPoint = ((UdpReceiveResult)udpReceiveResult).RemoteEndPoint;
+                            Console.WriteLine($"{playerClient.Username}'s Udp endpoint: {playerClient.UdpEndPoint}");
+                        }
+
+                        break;
                 }
             }
     }
@@ -188,14 +198,14 @@ public class Server
             PlayerClient? client = _clients.FirstOrDefault(c => c.Username == packet!.Username);
             if (client != null)
             {
-                await HandlePacket(json, client);
+                await HandlePacket(json, client, result);
             }
                 //switch (packet.Type)
                 //{
                 //    case "udp_init":
                 //        if (client != null)
                 //        {
-                //            client.UdpEndPoint = result.RemoteEndPoint;
+                //            client.UdpEndPoint = result.RemoteEndPoint; 
                 //            Console.WriteLine($"{client.Username}'s Udp endpoint: {client.UdpEndPoint}");
                 //        }
 
