@@ -5,6 +5,7 @@ using SDL3;
 using Smash;
 using Smash.Graphics;
 using Smash.Input;
+using System.Configuration.Assemblies;
 
 public class GamingState : GameState
 {
@@ -95,7 +96,7 @@ public class GamingState : GameState
                 if (_chatMessage != string.Empty)
                 {
                     _ = App.SendPacketTcp(new PingPacket() { Type = "ping", Username = _playerData.Username, Message = _chatMessage });
-                    _chatHistory.Add((_playerData.Username, _chatMessage));
+                    SendChatMessage(_playerData.Username, _chatMessage);
 
                     _chatMessage = "";
                 }
@@ -181,7 +182,12 @@ public class GamingState : GameState
             for (int i = startIndex; i < _chatHistory.Count; i++)
             {
                 Vector2 textPosition = Vector2.Round(chatStartPos + new Vector2(10, (i - startIndex) * CHAT_LINE_SPACING));
-                renderer.RenderText(App.Font, $"<{_chatHistory[i].username}>  {_chatHistory[i].message}", textPosition, Color.White);
+
+                if (_chatHistory[i].username != string.Empty)
+                    renderer.RenderText(App.Font, $"<{_chatHistory[i].username}>  {_chatHistory[i].message}", textPosition, Color.White);
+                else
+                    renderer.RenderText(App.Font, $"{_chatHistory[i].message}", textPosition, Color.MediumSpringGreen);
+
             }
         }
 
@@ -204,16 +210,23 @@ public class GamingState : GameState
 
             case "leave":
                 Console.WriteLine("Received leave packet from " + packet.Username);
+                SendChatMessage("", $"{packet.Username} has left the game");
                 _peersData!.Remove(packet.Username);
                 break;
 
             case "ping":
                 PingPacket pingPacket = JsonSerializer.Deserialize<PingPacket>(json)!;
-                _chatHistory.Add((pingPacket.Username, pingPacket.Message));
+                SendChatMessage(pingPacket.Username, pingPacket.Message);
                 _chatCooldown = CHAT_BASE_COOLDOWN;
                 break;
         }
 
         base.ForwardPacket(packet, json);
+    }
+
+    private void SendChatMessage(string username, string message)
+    {
+        _chatHistory.Add((username, message));
+        _chatCooldown = CHAT_BASE_COOLDOWN;
     }
 }

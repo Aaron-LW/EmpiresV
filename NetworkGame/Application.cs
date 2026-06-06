@@ -37,8 +37,6 @@ public class App : Application
         CreateWindowAndRenderer("Networkgame", 1080, 800, out _window, out _renderer);
         _window.SetWindowResizable(true);
 
-        NotificationManager.Window = _window;
-
         AssetManager.SetDefaultScaleMode(ScaleMode.Nearest);
         AssetManager.SetAssetRootDirectory(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets"));
 

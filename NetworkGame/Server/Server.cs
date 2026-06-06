@@ -152,7 +152,7 @@ public class Server
                         if (Program.TCPOnly)
                             await BroadCastPacketTcp(positionUpdatePacket);
                         else
-                            await BroadCastPacketUdp(positionUpdatePacket);
+                            _ = BroadCastPacketUdp(positionUpdatePacket);
 
                         playerClient.PlayerData.X = positionUpdatePacket.X;
                         playerClient.PlayerData.Y = positionUpdatePacket.Y;
@@ -200,29 +200,6 @@ public class Server
             {
                 await HandlePacket(json, client, result);
             }
-                //switch (packet.Type)
-                //{
-                //    case "udp_init":
-                //        if (client != null)
-                //        {
-                //            client.UdpEndPoint = result.RemoteEndPoint; 
-                //            Console.WriteLine($"{client.Username}'s Udp endpoint: {client.UdpEndPoint}");
-                //        }
-
-                //        break;
-
-                //    case "update_pos":
-                //        PositionUpdatePacket positionUpdatePacket = JsonSerializer.Deserialize<PositionUpdatePacket>(json)!;  
-
-                //        if (client != null)
-                //        {
-                //            client.PlayerData.X = positionUpdatePacket.X;
-                //            client.PlayerData.Y = positionUpdatePacket.Y;
-                //        }
-
-                //        await BroadCastPacketUdp(positionUpdatePacket);
-                //        break;
-                //}
         }
     }
 

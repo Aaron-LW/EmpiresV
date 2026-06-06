@@ -171,7 +171,12 @@ public class LobbyState : GameState
         {
             Vector2 position = startPos + new Vector2(0, i * 40) + new Vector2(0, _chatScroll);
             if (position.Y < 0) continue;
-            renderer.RenderText(App.Font, $"{_chat[i].username}: {_chat[i].message}", Vector2.Round(position), Color.White);
+            
+            if (_chat[i].username != string.Empty)
+                renderer.RenderText(App.Font, $"{_chat[i].username}: {_chat[i].message}", Vector2.Round(position), Color.White);
+            else
+                renderer.RenderText(App.Font, $"{_chat[i].message}", Vector2.Round(position), Color.MediumSpringGreen);
+
         }
 
         SDL.SetRenderClipRect(renderer.Handle, 0);
@@ -199,6 +204,7 @@ public class LobbyState : GameState
                 JoinPacket joinPacket = JsonSerializer.Deserialize<JoinPacket>(json)!;
                 lock (_playerDataLock) _playerData.Add(joinPacket.Username, new PlayerData() { Username = joinPacket.Username });
                 Console.WriteLine("Received join packet from " + joinPacket.Username);
+                _chat.Add(("", $"{packet.Username} has joined the game"));
                 break;
 
             case "playerData":
@@ -211,6 +217,12 @@ public class LobbyState : GameState
                 PingPacket pingPacket = JsonSerializer.Deserialize<PingPacket>(json)!;
                 _chat.Add((pingPacket.Username, pingPacket.Message));
                 _preferredChatScroll = Math.Min(-_chat.Count * 40 + _chatRectangle.Height - 25, 0);
+                break;
+
+            case "leave":
+                LeavePacket leavePacket = JsonSerializer.Deserialize<LeavePacket>(json)!;
+                _chat.Add(("", $"{packet.Username} has left the game"));
+                _playerData.Remove(leavePacket.Username);
                 break;
 
             case "start_game":
