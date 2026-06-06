@@ -28,11 +28,12 @@ internal static class Program
             Console.WriteLine("Running as client");
 
             SmashEngine.Init();
-            InputHandler.StartPollingTextInput();
 
             App application = new App(args.Contains("--game") || args.Contains("-g"), args.Contains("--host") || args.Contains("-h"));
             application.Start();
 
+            InputHandler.StartPollingTextInput();
+            
             while (!application.ApplicationShouldClose())
             {
                 SmashEngine.Update();

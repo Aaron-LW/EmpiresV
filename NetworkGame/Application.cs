@@ -36,7 +36,6 @@ public class App : Application
     {
         CreateWindowAndRenderer("Networkgame", 1080, 800, out _window, out _renderer);
         _window.SetWindowResizable(true);
-        SDL.StartTextInput(_window.Handle);
 
         NotificationManager.Window = _window;
 
@@ -54,6 +53,7 @@ public class App : Application
         AssetManager.AddTextureRegion("Geyser", new TextureRegion("TextureAtlas", 0, 32, 16, 16));
 
         _renderer.SetVSyncEnabled(true);
+        _renderer.SetRenderBlendMode(BlendMode.Blend);
 
         string dataFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EmpiresV", "data.json");
         string? username = null;
@@ -94,27 +94,22 @@ public class App : Application
     public override void Update(double deltaTime) 
     {
         _elapsedTime += (float)deltaTime;
-        if (_elapsedTime >= 1f)
+        if (_elapsedTime > 0.5f)
         {
             _fps = 1f / deltaTime;
-            _elapsedTime = 0;
+            _elapsedTime = 0f;
         }
 
         _currentState?.Update(deltaTime);
         NotificationManager.Update(deltaTime);
-
-        if (InputHandler.IsLeftMousePressed())
-        {
-            NotificationManager.Notify("test test test", NotificationLevel.Normal);
-        }
     }
 
     public override void Render() 
     {
         _currentState?.Render(_renderer);
-        NotificationManager.Render(_renderer);
 
-        _renderer.RenderText(Font, $"Fps: {(int)_fps}", new Vector2(WindowWidth - Font.MeasureString($"Fps: {(int)_fps}").X - 20, 20), Color.White);
+        string fpsText = $"Fps: {Math.Round(_fps)}";
+        //_renderer.RenderText(Font, fpsText, new Vector2(WindowWidth - Font.MeasureString(fpsText).X - 20, 20), Color.White);
 
         _renderer.RenderPresent();
     }
@@ -164,7 +159,7 @@ public class App : Application
             {
                 if (lobbyStateResult.Seed != 0)
                 {
-                    SetState(new GamingState(stateFinishEventArgs.StateResult, lobbyStateResult.Seed));
+                    SetState(new GamingState(lobbyStateResult, lobbyStateResult.Seed));
                 }
                 else
                 {
@@ -172,7 +167,7 @@ public class App : Application
                     int seed = random.Next(100, 5000);
 
                     SendPacketTcp(new StartGamePacket() { Type = "start_game", Username = stateFinishEventArgs.StateResult.PlayerData.Username, Seed = seed }).GetAwaiter().GetResult();
-                    SetState(new GamingState(stateFinishEventArgs.StateResult, seed));
+                    SetState(new GamingState(lobbyStateResult, seed));
                 }
             }
         }

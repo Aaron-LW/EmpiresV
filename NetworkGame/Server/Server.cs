@@ -135,7 +135,12 @@ public class Server
                 {
                     case "update_pos":
                         PositionUpdatePacket positionUpdatePacket = JsonSerializer.Deserialize<PositionUpdatePacket>(json)!;
-                        await BroadCastPacketTcp(positionUpdatePacket);
+                        
+                        if (Program.TCPOnly)
+                            await BroadCastPacketTcp(positionUpdatePacket);
+                        else
+                            await BroadCastPacketUdp(positionUpdatePacket);
+
                         playerClient.PlayerData.X = positionUpdatePacket.X;
                         playerClient.PlayerData.Y = positionUpdatePacket.Y;
                         break;
@@ -167,33 +172,34 @@ public class Server
             string json = Encoding.UTF8.GetString(result.Buffer);
             Packet? packet = JsonSerializer.Deserialize<Packet>(json);
 
-            if (packet != null)
+            PlayerClient? client = _clients.FirstOrDefault(c => c.Username == packet!.Username);
+            if (client != null)
             {
-                PlayerClient? client = _clients.FirstOrDefault(c => c.Username == packet.Username);
-                switch (packet.Type)
-                {
-                    case "udp_init":
-                        if (client != null)
-                        {
-                            client.UdpEndPoint = result.RemoteEndPoint;
-                            Console.WriteLine($"{client.Username}'s Udp endpoint: {client.UdpEndPoint}");
-                        }
-
-                        break;
-
-                    case "update_pos":
-                        PositionUpdatePacket positionUpdatePacket = JsonSerializer.Deserialize<PositionUpdatePacket>(json)!;  
-
-                        if (client != null)
-                        {
-                            client.PlayerData.X = positionUpdatePacket.X;
-                            client.PlayerData.Y = positionUpdatePacket.Y;
-                        }
-
-                        await BroadCastPacketUdp(positionUpdatePacket);
-                        break;
-                }
+                await HandlePacket(json, client);
             }
+                //switch (packet.Type)
+                //{
+                //    case "udp_init":
+                //        if (client != null)
+                //        {
+                //            client.UdpEndPoint = result.RemoteEndPoint;
+                //            Console.WriteLine($"{client.Username}'s Udp endpoint: {client.UdpEndPoint}");
+                //        }
+
+                //        break;
+
+                //    case "update_pos":
+                //        PositionUpdatePacket positionUpdatePacket = JsonSerializer.Deserialize<PositionUpdatePacket>(json)!;  
+
+                //        if (client != null)
+                //        {
+                //            client.PlayerData.X = positionUpdatePacket.X;
+                //            client.PlayerData.Y = positionUpdatePacket.Y;
+                //        }
+
+                //        await BroadCastPacketUdp(positionUpdatePacket);
+                //        break;
+                //}
         }
     }
 
@@ -209,6 +215,7 @@ public class Server
             NetworkStream networkStream = playerClient.TcpClient.GetStream();
 
             await playerClient.SendLock.WaitAsync();
+
             try
             {
                 await networkStream.WriteAsync(data, 0, data.Length);

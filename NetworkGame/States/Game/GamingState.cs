@@ -1,4 +1,4 @@
-using System.Drawing;
+using Color = System.Drawing.Color;
 using System.Numerics;
 using System.Text.Json;
 using SDL3;
@@ -15,6 +15,12 @@ public class GamingState : GameState
     private const int WORLD_HEIGHT = 800;
 
     private const int CAMERA_SPEED = 1000;
+
+    private const int CHAT_LINE_SPACING = 30;
+    private const int CHAT_BASE_COOLDOWN = 4;
+    private const int CHAT_MAX_MESSAGES = 10;
+    private const int CHAT_BAR_HEIGHT = 50;
+    private const int CHAT_OPACITY = 180;
 
     private float _zoom = 1;
     private float _preferredZoom = 1;
@@ -33,10 +39,22 @@ public class GamingState : GameState
     private ComponentManager _componentManager = new();
     private List<ISystem> _systems = new();
 
+    private bool _chatFocused = false;
+    private float _chatCooldown;
+    private string _chatMessage = "";
+
+    private List<(string username, string message)> _chatHistory = new();
+
     public GamingState(StateResult previousStateResult, int worldSeed) : base(previousStateResult)
     {
         _playerData = previousStateResult.PlayerData;
         _peersData = previousStateResult.PeerData;
+
+        if (previousStateResult is LobbyStateResult lobbyStateResult)
+        {
+            _chatHistory = lobbyStateResult.ChatHistory;
+            _chatCooldown = CHAT_BASE_COOLDOWN;
+        }
 
         _backgroundTileEngine = new(WORLD_WIDTH, WORLD_HEIGHT, 1);
         _backgroundTileEngine.GenerateWorld(worldSeed);
@@ -50,11 +68,55 @@ public class GamingState : GameState
             _backgroundTileEngine.SetZoom(_zoom);
         }
 
+        if (!_chatFocused)
+            _chatCooldown -= (float)deltaTime;
+
+
         Vector2 movementVector = new();
-        if (InputHandler.IsKeyDown(SDL.Keycode.D)) movementVector.X += 1;
-        if (InputHandler.IsKeyDown(SDL.Keycode.A)) movementVector.X -= 1;
-        if (InputHandler.IsKeyDown(SDL.Keycode.W)) movementVector.Y -= 1;
-        if (InputHandler.IsKeyDown(SDL.Keycode.S)) movementVector.Y += 1;
+
+        if (!_chatFocused)
+        {
+            if (InputHandler.IsKeyDown(SDL.Keycode.D)) movementVector.X += 1;
+            if (InputHandler.IsKeyDown(SDL.Keycode.A)) movementVector.X -= 1;
+            if (InputHandler.IsKeyDown(SDL.Keycode.W)) movementVector.Y -= 1;
+            if (InputHandler.IsKeyDown(SDL.Keycode.S)) movementVector.Y += 1;
+
+            if (InputHandler.IsKeyPressed(SDL.Keycode.Return))
+            {
+                _chatFocused = true;     
+                _chatCooldown = CHAT_BASE_COOLDOWN;
+            }
+        }
+        else
+        {
+            _chatMessage += InputHandler.TextInput;
+            if (InputHandler.IsKeyPressed(SDL.Keycode.Return))
+            {
+                if (_chatMessage != string.Empty)
+                {
+                    _ = App.SendPacketTcp(new PingPacket() { Type = "ping", Username = _playerData.Username, Message = _chatMessage });
+                    _chatHistory.Add((_playerData.Username, _chatMessage));
+
+                    _chatMessage = "";
+                }
+
+                _chatFocused = false;
+            }
+
+            if (InputHandler.IsKeyPressed(SDL.Keycode.Backspace))
+            {
+                if (InputHandler.IsKeyDown(SDL.Keycode.LCtrl))
+                {
+                    _chatMessage = "";
+                }
+
+                if (_chatMessage.Length > 0)
+                {
+                    _chatMessage = _chatMessage.Remove(_chatMessage.Length - 1, 1);
+                }
+            }
+        }
+
         _playerData.X += movementVector.X * CAMERA_SPEED * (float)deltaTime;
         _playerData.Y += movementVector.Y * CAMERA_SPEED * (float)deltaTime;
 
@@ -108,6 +170,26 @@ public class GamingState : GameState
                 renderer.RenderTexture(AssetManager.GetTexture("mogus"), (peer.Value.Position - _cameraPosition) * _zoom, Color.White, _zoom);
             }
         }
+
+        Vector2 chatStartPos = new Vector2(0, App.WindowHeight / 2);
+        if (_chatCooldown > 0 && _chatHistory.Count > 0)
+        {
+            Rectangle chatRectangle = new(chatStartPos - new Vector2(0, 5), Math.Max(App.WindowWidth / 3f, 400), Math.Min(_chatHistory.Count, CHAT_MAX_MESSAGES) * CHAT_LINE_SPACING + 10);
+            renderer.RenderFilledRectangle(chatRectangle, Color.FromArgb(CHAT_OPACITY, 0, 0, 0));
+
+            int startIndex = Math.Max(_chatHistory.Count - CHAT_MAX_MESSAGES, 0);
+            for (int i = startIndex; i < _chatHistory.Count; i++)
+            {
+                Vector2 textPosition = Vector2.Round(chatStartPos + new Vector2(10, (i - startIndex) * CHAT_LINE_SPACING));
+                renderer.RenderText(App.Font, $"<{_chatHistory[i].username}>  {_chatHistory[i].message}", textPosition, Color.White);
+            }
+        }
+
+        if (_chatFocused)
+        {
+            renderer.RenderFilledRectangle(new Rectangle(0, App.WindowHeight - CHAT_BAR_HEIGHT, App.WindowWidth, CHAT_BAR_HEIGHT), Color.FromArgb(CHAT_OPACITY, 0, 0, 0));
+            renderer.RenderText(App.Font, _chatMessage, new Vector2(10, App.WindowHeight - CHAT_BAR_HEIGHT) + new Vector2(0, CHAT_BAR_HEIGHT / 2) - new Vector2(0, App.Font.MeasureString(_chatMessage).Y / 2), Color.White);
+        }
     }
 
     public override void ForwardPacket(Packet packet, string json)
@@ -118,6 +200,17 @@ public class GamingState : GameState
                 PositionUpdatePacket positionUpdatePacket = JsonSerializer.Deserialize<PositionUpdatePacket>(json)!;
                 _peersData![positionUpdatePacket.Username].X = positionUpdatePacket.X;
                 _peersData![positionUpdatePacket.Username].Y = positionUpdatePacket.Y;
+                break;
+
+            case "leave":
+                Console.WriteLine("Received leave packet from " + packet.Username);
+                _peersData!.Remove(packet.Username);
+                break;
+
+            case "ping":
+                PingPacket pingPacket = JsonSerializer.Deserialize<PingPacket>(json)!;
+                _chatHistory.Add((pingPacket.Username, pingPacket.Message));
+                _chatCooldown = CHAT_BASE_COOLDOWN;
                 break;
         }
 

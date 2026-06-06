@@ -28,9 +28,9 @@ public class TileEngine
         noise.SetCellularJitter(0.5f);
         noise.SetFrequency(0.002f);
 
-        for (int y = 0; y < _mapHeight; y++)
+        for (int y = -(_mapHeight / 2); y < _mapHeight / 2; y++)
         {
-            for (int x = 0; x < _mapWidth; x++)
+            for (int x = -(_mapWidth / 2); x < _mapWidth / 2; x++)
             {
                 float noiseValue = noise.GetNoise(x, y);
 
@@ -40,10 +40,10 @@ public class TileEngine
                 if (noiseValue < 0.65f) brightness = 0.65f;
                 if (noiseValue < 0.4f) brightness = 0.4f;
 
-                Chunk chunk = GetOrCreateChunk(new Vector2(x * GamingState.TILE_WIDTH, y * GamingState.TILE_HEIGHT));
+                (Vector2 chunkPos, Chunk chunk) = GetOrCreateChunk(new Vector2(x * GamingState.TILE_WIDTH, y * GamingState.TILE_HEIGHT));
 
-                int chunkX = x * GamingState.TILE_WIDTH % Chunk.CHUNK_PIXEL_WIDTH;
-                int chunkY = y * GamingState.TILE_HEIGHT % Chunk.CHUNK_PIXEL_HEIGHT;
+                int chunkX = x * GamingState.TILE_WIDTH - (int)chunkPos.X;
+                int chunkY = y * GamingState.TILE_HEIGHT - (int)chunkPos.Y;
 
                 chunk.PlaceTileAt(new Vector2(chunkX, chunkY), AssetManager.GetTexture("Grass"), brightness);
             }
@@ -98,10 +98,10 @@ public class TileEngine
 
     public bool PlaceTileAt(Texture2D texture, Vector2 worldPosition)
     {
-        Chunk chunk = GetOrCreateChunk(worldPosition);
+        (Vector2 chunkPos, Chunk chunk) = GetOrCreateChunk(worldPosition);
 
-        float chunkX = worldPosition.X % Chunk.CHUNK_PIXEL_WIDTH;
-        float chunkY = worldPosition.Y % Chunk.CHUNK_PIXEL_HEIGHT;
+        float chunkX = worldPosition.X - chunkPos.X;
+        float chunkY = worldPosition.Y - chunkPos.Y;
 
         if (!chunk.PlaceTileAt(new Vector2(chunkX, chunkY), texture, 1f)) return false;
         return true;
@@ -119,16 +119,16 @@ public class TileEngine
                            (int)MathF.Floor(worldPosition.Y / Chunk.CHUNK_PIXEL_HEIGHT) * Chunk.CHUNK_PIXEL_HEIGHT);
     }
 
-    private Chunk GetOrCreateChunk(Vector2 worldPosition)
+    private (Vector2, Chunk) GetOrCreateChunk(Vector2 worldPosition)
     {
         Vector2 chunkPosition = AlignToChunkGrid(worldPosition);
 
         if (_chunks.TryGetValue(chunkPosition, out Chunk? foundChunk))
         {
-            return foundChunk;
+            return (chunkPosition, foundChunk);
         }
 
         _chunks.Add(chunkPosition, new Chunk());
-        return _chunks[chunkPosition];
+        return (chunkPosition, _chunks[chunkPosition]);
     }
 }

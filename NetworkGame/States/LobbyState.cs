@@ -22,7 +22,7 @@ public class LobbyState : GameState
     private InputField _chatInputField;
     private Rectangle _chatRectangle => new Rectangle(_chatInputField.Position + new Vector2(0, _chatInputField.Height), App.WindowWidth, App.WindowHeight - (_chatInputField.Y + _chatInputField.Height));
 
-    private List<PingPacket> _chat = new();
+    private List<(string username, string message)> _chat = new();
     private float _chatScroll = 0;
     private float _preferredChatScroll = 0;
 
@@ -87,6 +87,7 @@ public class LobbyState : GameState
                         PeerData = _playerData,
                         Type = "lobby",
                         Seed = 0,
+                        ChatHistory = _chat
                     });
                 }
             }
@@ -108,7 +109,8 @@ public class LobbyState : GameState
             {
                 PingPacket pingPacket = new PingPacket() { Type = "ping", Message = _chatInputField.Text, Username = _userPlayerData.Username };
                 _ = App.SendPacketTcp(pingPacket);
-                _chat.Add(pingPacket);
+
+                _chat.Add((_userPlayerData.Username, _chatInputField.Text));
                 _preferredChatScroll = Math.Min(-_chat.Count * 40 + _chatRectangle.Height - 25, 0);
                 _chatInputField.Text = "";
             }
@@ -169,7 +171,7 @@ public class LobbyState : GameState
         {
             Vector2 position = startPos + new Vector2(0, i * 40) + new Vector2(0, _chatScroll);
             if (position.Y < 0) continue;
-            renderer.RenderText(App.Font, $"{_chat[i].Username}: {_chat[i].Message}", Vector2.Round(position), Color.White);
+            renderer.RenderText(App.Font, $"{_chat[i].username}: {_chat[i].message}", Vector2.Round(position), Color.White);
         }
 
         SDL.SetRenderClipRect(renderer.Handle, 0);
@@ -207,7 +209,7 @@ public class LobbyState : GameState
 
             case "ping":
                 PingPacket pingPacket = JsonSerializer.Deserialize<PingPacket>(json)!;
-                _chat.Add(pingPacket);
+                _chat.Add((pingPacket.Username, pingPacket.Message));
                 _preferredChatScroll = Math.Min(-_chat.Count * 40 + _chatRectangle.Height - 25, 0);
                 break;
 
@@ -218,7 +220,8 @@ public class LobbyState : GameState
                     PlayerData = _userPlayerData,
                     PeerData = _playerData,
                     Type = "lobby",
-                    Seed = startGamePacket.Seed
+                    Seed = startGamePacket.Seed,
+                    ChatHistory = _chat
                 });
 
                 break;
