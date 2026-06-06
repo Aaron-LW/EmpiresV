@@ -9,6 +9,7 @@ public class Server
     private readonly object _lock = new();
 
     private UdpClient? _udpServer;
+    private bool _gameStarted = false;
 
     public async Task Main()
     {
@@ -38,7 +39,18 @@ public class Server
             LoginPacket? loginRequestPacket = JsonSerializer.Deserialize<LoginPacket>(Encoding.UTF8.GetString(buffer, 0, bytesRead));
             if (loginRequestPacket == null) throw new Exception("Login request packet was null D:");
 
+            Console.WriteLine($"Got login request packet from {loginRequestPacket.Username}");
+
             bool host = _clients.Count == 0;
+
+            if (_gameStarted)
+            {
+                Console.WriteLine($"Denying client because the game has already been started");
+
+                await clientStream.WriteAsync(new ReadOnlyMemory<byte>([00000002]));
+                client.Close();
+                continue;
+            }
 
             if (_clients.Any(c => c.Username == loginRequestPacket.Username))
             {
@@ -153,6 +165,7 @@ public class Server
                     case "start_game":
                         StartGamePacket startGamePacket = JsonSerializer.Deserialize<StartGamePacket>(json)!;
                         await BroadCastPacketTcp(startGamePacket);
+                        _gameStarted = true;
                         break;
 
                     case "place_tile":

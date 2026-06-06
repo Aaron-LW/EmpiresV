@@ -297,6 +297,10 @@ public class App : Application
                 case 00000001:
                     Console.WriteLine("User with the same name already exists");
                     break;
+
+                case 00000002:
+                    Console.WriteLine("Game has already been started");
+                    break;
             }
 
             networkStream.Close();
