@@ -99,7 +99,6 @@ public class App : Application
         }
 
         _currentState?.Update(deltaTime);
-        NotificationManager.Update(deltaTime);
     }
 
     public override void Render() 
