@@ -5,7 +5,6 @@ using SDL3;
 using Smash;
 using Smash.Graphics;
 using Smash.Input;
-using System.Configuration.Assemblies;
 
 public class GamingState : GameState
 {
@@ -27,6 +26,7 @@ public class GamingState : GameState
     private float _preferredZoom = 1;
 
     private TileEngine _backgroundTileEngine;
+    private TileEngine _tileEngine;
 
     private float _cameraX;
     private float _cameraY;
@@ -34,11 +34,6 @@ public class GamingState : GameState
 
     private PlayerData _playerData;
     private Dictionary<string, PlayerData>? _peersData;
-
-    private List<Entity> _entities = new();
-
-    private ComponentManager _componentManager = new();
-    private List<ISystem> _systems = new();
 
     private bool _chatFocused = false;
     private float _chatCooldown;
@@ -59,6 +54,8 @@ public class GamingState : GameState
 
         _backgroundTileEngine = new(WORLD_WIDTH, WORLD_HEIGHT, 1);
         _backgroundTileEngine.GenerateWorld(worldSeed);
+
+        _tileEngine = new(WORLD_WIDTH, WORLD_HEIGHT, 1);
     }
 
     public override void Update(double deltaTime)
@@ -67,6 +64,7 @@ public class GamingState : GameState
         {
             _zoom = MathHelper.Lerp(_zoom, _preferredZoom, 30 * (float)deltaTime);
             _backgroundTileEngine.SetZoom(_zoom);
+            _tileEngine.SetZoom(_zoom);
         }
 
         if (!_chatFocused)
@@ -143,6 +141,15 @@ public class GamingState : GameState
         {
             _preferredZoom = 1;
         }
+
+        if (InputHandler.IsLeftMousePressed())
+        {
+            Vector2 position = InputHandler.MousePosition / _zoom + _cameraPosition;
+            if (_tileEngine.PlaceTile(AssetManager.GetTexture("CoalTile"), position))
+            {
+                _ = App.SendPacketTcp(new PlaceTilePacket() { Type = "place_tile", Username = _playerData.Username, TextureName = "CoalTile", X = position.X, Y = position.Y});
+            }
+        }
     }
 
     public override void Render(Renderer renderer)
@@ -150,17 +157,7 @@ public class GamingState : GameState
         renderer.Clear(Color.CornflowerBlue);
 
         _backgroundTileEngine.Render(renderer, _cameraPosition);
-
-        foreach (Entity entity in _entities)
-        {
-            TextureComponent? textureComponent = _componentManager.Query<TextureComponent>(entity.Id);
-            PositionComponent? positionComponent = _componentManager.Query<PositionComponent>(entity.Id);
-
-            if (textureComponent != null && positionComponent != null)
-            {
-                renderer.RenderTexture(textureComponent.Texture, (positionComponent.Position - _cameraPosition) * _zoom, Color.White, textureComponent.Scale * _zoom);
-            }
-        }
+        _tileEngine.Render(renderer, _cameraPosition);
 
         renderer.RenderTexture(AssetManager.GetTexture("mogus"), (_playerData.Position - _cameraPosition) * _zoom, Color.White, _zoom);
 
@@ -218,6 +215,11 @@ public class GamingState : GameState
                 PingPacket pingPacket = JsonSerializer.Deserialize<PingPacket>(json)!;
                 SendChatMessage(pingPacket.Username, pingPacket.Message);
                 _chatCooldown = CHAT_BASE_COOLDOWN;
+                break;
+
+            case "place_tile":
+                PlaceTilePacket placeTilePacket = JsonSerializer.Deserialize<PlaceTilePacket>(json)!;
+                _tileEngine.PlaceTile(AssetManager.GetTexture(placeTilePacket.TextureName), new Vector2(placeTilePacket.X, placeTilePacket.Y));
                 break;
         }
 

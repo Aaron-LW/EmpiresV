@@ -61,7 +61,7 @@ public class TileEngine
             float oreX = random.Next(0, _mapWidth * GamingState.TILE_WIDTH);
             float oreY = random.Next(0, _mapHeight * GamingState.TILE_HEIGHT);
 
-            PlaceTileAt(AssetManager.GetTexture("CoalTile"), AlignToGrid(new Vector2(oreX, oreY)));
+            PlaceTile(AssetManager.GetTexture("CoalTile"), AlignToGrid(new Vector2(oreX, oreY)));
         }
     }
 
@@ -96,7 +96,7 @@ public class TileEngine
         _zoom = newZoom;
     }
 
-    public bool PlaceTileAt(Texture2D texture, Vector2 worldPosition)
+    public bool PlaceTile(Texture2D texture, Vector2 worldPosition)
     {
         (Vector2 chunkPos, Chunk chunk) = GetOrCreateChunk(worldPosition);
 
