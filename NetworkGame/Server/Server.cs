@@ -37,7 +37,7 @@ public class Server
             byte[] buffer = new byte[1024];
             int bytesRead = clientStream.Read(buffer);
 
-            LoginPacket? loginRequestPacket = JsonSerializer.Deserialize<LoginPacket>(Encoding.UTF8.GetString(buffer, 0, bytesRead));
+            LoginPacket? loginRequestPacket = JsonSerializer.Deserialize<LoginPacket>(Encoding.UTF8.GetString(buffer, 1, bytesRead - 1));
             if (loginRequestPacket == null) throw new Exception("Login request packet was null D:");
 
             Console.WriteLine($"Got login request packet from {loginRequestPacket.Username}");
@@ -48,7 +48,7 @@ public class Server
             {
                 Console.WriteLine($"Denying client because the game has already been started");
 
-                await clientStream.WriteAsync(new ReadOnlyMemory<byte>([00000002]));
+                await clientStream.WriteAsync(new ReadOnlyMemory<byte>([0x02]));
                 client.Close();
                 continue;
             }
@@ -57,13 +57,13 @@ public class Server
             {
                 Console.WriteLine($"Denying client because username {loginRequestPacket.Username} has already been taken");
 
-                await clientStream.WriteAsync(new ReadOnlyMemory<byte>([00000001]));
+                await clientStream.WriteAsync(new ReadOnlyMemory<byte>([0x01]));
                 client.Close();
                 continue;
             }
             else
             {
-                await clientStream.WriteAsync(new ReadOnlyMemory<byte>([00000000, host ? (byte)00000001 : (byte)00000000]));
+                await clientStream.WriteAsync(new ReadOnlyMemory<byte>([0x00, host ? (byte)0x01 : (byte)0x00]));
             }
 
 
@@ -80,7 +80,7 @@ public class Server
                 _clients.Add(playerClient);
             }
 
-            await Task.Run(async () => BroadCastPacketTcp(new JoinPacket { Type = "join", Username = loginRequestPacket.Username, NewJoin = true}));
+            await Task.Run(async () => BroadCastPacketTcp(PacketId.PACKET_JOIN, new JoinPacket { Username = loginRequestPacket.Username, NewJoin = true}));
             Console.WriteLine($"{loginRequestPacket.Username} has joined the server " + (host ? "as host" : ""));
             _ = HandleClientTcp(playerClient);
         }
@@ -94,7 +94,9 @@ public class Server
         {
             if (alreadyJoinedClient.Username == playerClient.Username) continue;
             Console.WriteLine($"Sending player data packet from {alreadyJoinedClient.Username} to {playerClient.Username}");
-            await networkStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new PlayerDataPacket { Type = "playerData", Username = alreadyJoinedClient.Username, PlayerData = alreadyJoinedClient.PlayerData }) + "\n"));
+            
+            byte[] data = [PacketId.PACKET_PLAYERDATA, .. Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new PlayerDataPacket { Username = alreadyJoinedClient.Username, PlayerData = alreadyJoinedClient.PlayerData }) + "\n")];
+            await networkStream.WriteAsync(data);
         }
 
         StringBuilder stringBuilder = new();
@@ -108,7 +110,7 @@ public class Server
 
                 if (bytesRead == 0)
                 {
-                    await BroadCastPacketTcp(new LeavePacket { Type = "leave", Username = playerClient.Username});
+                    await BroadCastPacketTcp(PacketId.PACKET_LEAVE, new LeavePacket { Username = playerClient.Username});
                     Console.WriteLine($"{playerClient.Username} has left");
 
                     lock (_lock)
@@ -135,7 +137,7 @@ public class Server
                     string line = full.Substring(0, index).Trim();
                     stringBuilder.Remove(0, index + 1);
 
-                    await HandlePacket(line, playerClient);
+                    await HandlePacket(Convert.ToByte(line[0]), line.Substring(1, line.Length - 1), playerClient);
                 }
             }
         }
@@ -145,52 +147,47 @@ public class Server
         }
     }
 
-    private async Task HandlePacket(string json, PlayerClient playerClient, UdpReceiveResult? udpReceiveResult = null)
+    private async Task HandlePacket(byte id, string json, PlayerClient playerClient, UdpReceiveResult? udpReceiveResult = null)
     {
-        Packet? packet = JsonSerializer.Deserialize<Packet>(json);
+        switch (id)
+        {
+            case PacketId.PACKET_UPDATE_POS:
+                PositionUpdatePacket positionUpdatePacket = JsonSerializer.Deserialize<PositionUpdatePacket>(json)!;
+                
+                if (Program.TCPOnly)
+                    await BroadCastPacketTcp(PacketId.PACKET_UPDATE_POS, positionUpdatePacket);
+                else
+                    _ = BroadCastPacketUdp(PacketId.PACKET_UPDATE_POS, positionUpdatePacket);
 
-        if (packet != null)
-            {
-                switch (packet.Type)
+                playerClient.PlayerData.X = positionUpdatePacket.X;
+                playerClient.PlayerData.Y = positionUpdatePacket.Y;
+                break;
+
+            case PacketId.PACKET_PING:
+                PingPacket pingPacket = JsonSerializer.Deserialize<PingPacket>(json)!;
+                await BroadCastPacketTcp(PacketId.PACKET_PING, pingPacket);
+                break;
+
+            case PacketId.PACKET_START_GAME:
+                StartGamePacket startGamePacket = JsonSerializer.Deserialize<StartGamePacket>(json)!;
+                await BroadCastPacketTcp(PacketId.PACKET_START_GAME, startGamePacket);
+                _gameStarted = true;
+                break;
+
+            case PacketId.PACKET_PLACE_TILE:
+                PlaceTilePacket placeTilePacket = JsonSerializer.Deserialize<PlaceTilePacket>(json)!;
+                await BroadCastPacketTcp(PacketId.PACKET_PLACE_TILE, placeTilePacket);
+                break;
+
+            case PacketId.PACKET_UDP_INIT:
+                if (udpReceiveResult != null)
                 {
-                    case "update_pos":
-                        PositionUpdatePacket positionUpdatePacket = JsonSerializer.Deserialize<PositionUpdatePacket>(json)!;
-                        
-                        if (Program.TCPOnly)
-                            await BroadCastPacketTcp(positionUpdatePacket);
-                        else
-                            _ = BroadCastPacketUdp(positionUpdatePacket);
-
-                        playerClient.PlayerData.X = positionUpdatePacket.X;
-                        playerClient.PlayerData.Y = positionUpdatePacket.Y;
-                        break;
-
-                    case "ping":
-                        PingPacket pingPacket = JsonSerializer.Deserialize<PingPacket>(json)!;
-                        await BroadCastPacketTcp(pingPacket);
-                        break;
-
-                    case "start_game":
-                        StartGamePacket startGamePacket = JsonSerializer.Deserialize<StartGamePacket>(json)!;
-                        await BroadCastPacketTcp(startGamePacket);
-                        _gameStarted = true;
-                        break;
-
-                    case "place_tile":
-                        PlaceTilePacket placeTilePacket = JsonSerializer.Deserialize<PlaceTilePacket>(json)!;
-                        await BroadCastPacketTcp(placeTilePacket);
-                        break;
-
-                    case "udp_init":
-                        if (udpReceiveResult != null)
-                        {
-                            playerClient.UdpEndPoint = ((UdpReceiveResult)udpReceiveResult).RemoteEndPoint;
-                            Console.WriteLine($"{playerClient.Username}'s Udp endpoint: {playerClient.UdpEndPoint}");
-                        }
-
-                        break;
+                    playerClient.UdpEndPoint = ((UdpReceiveResult)udpReceiveResult).RemoteEndPoint;
+                    Console.WriteLine($"{playerClient.Username}'s Udp endpoint: {playerClient.UdpEndPoint}");
                 }
-            }
+
+                break;
+        }
     }
 
     private async Task HandleUdp()
@@ -199,21 +196,21 @@ public class Server
         {
             UdpReceiveResult result = await _udpServer!.ReceiveAsync();
 
-            string json = Encoding.UTF8.GetString(result.Buffer);
+            string json = Encoding.UTF8.GetString(result.Buffer, 1, result.Buffer.Length - 1);
             Packet? packet = JsonSerializer.Deserialize<Packet>(json);
 
             PlayerClient? client = _clients.FirstOrDefault(c => c.Username == packet!.Username);
             if (client != null)
             {
-                await HandlePacket(json, client, result);
+                await HandlePacket(result.Buffer[0], json, client, result);
             }
         }
     }
 
-    private async Task BroadCastPacketTcp<T>(T packet) where T : Packet
+    private async Task BroadCastPacketTcp<T>(byte id, T packet) where T : Packet
     {
         string json = JsonSerializer.Serialize(packet) + "\n";
-        byte[] data = Encoding.UTF8.GetBytes(json);
+        byte[] data = [id, .. Encoding.UTF8.GetBytes(json)];
 
         foreach (PlayerClient playerClient in _clients)
         {
@@ -238,13 +235,13 @@ public class Server
         }
     }
 
-    private async Task BroadCastPacketUdp<T>(T packet) where T : Packet
+    private async Task BroadCastPacketUdp<T>(byte id, T packet) where T : Packet
     {
         foreach (PlayerClient playerClient in _clients)
         {
             if (packet.Username == playerClient.Username) continue;
 
-            byte[] data = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(packet) + "\n");
+            byte[] data = [id, .. Encoding.UTF8.GetBytes(JsonSerializer.Serialize(packet) + "\n")];
             await _udpServer!.SendAsync(data, data.Length, playerClient.UdpEndPoint);
         }
     }

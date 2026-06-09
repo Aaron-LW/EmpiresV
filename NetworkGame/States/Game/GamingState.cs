@@ -93,7 +93,7 @@ public class GamingState : GameState
             {
                 if (_chatMessage != string.Empty)
                 {
-                    _ = App.SendPacketTcp(new PingPacket() { Type = "ping", Username = _playerData.Username, Message = _chatMessage });
+                    _ = App.SendPacketTcp(PacketId.PACKET_PING, new PingPacket() { Username = _playerData.Username, Message = _chatMessage });
                     SendChatMessage(_playerData.Username, _chatMessage);
 
                     _chatMessage = "";
@@ -126,9 +126,9 @@ public class GamingState : GameState
         if (movementVector != Vector2.Zero)
         {
             if (Program.TCPOnly)
-                _ = App.SendPacketTcp(new PositionUpdatePacket() { Type = "update_pos", Username = _playerData.Username, X = _playerData.X, Y = _playerData.Y });
+                _ = App.SendPacketTcp(PacketId.PACKET_UPDATE_POS, new PositionUpdatePacket() { Username = _playerData.Username, X = _playerData.X, Y = _playerData.Y });
             else
-                _ = App.SendPacketUdp(new PositionUpdatePacket() { Type = "update_pos", Username = _playerData.Username, X = _playerData.X, Y = _playerData.Y });
+                _ = App.SendPacketUdp(PacketId.PACKET_UPDATE_POS, new PositionUpdatePacket() { Username = _playerData.Username, X = _playerData.X, Y = _playerData.Y });
         }
 
         if (InputHandler.ScrollWheelDelta != 0)
@@ -147,7 +147,7 @@ public class GamingState : GameState
             Vector2 position = InputHandler.MousePosition / _zoom + _cameraPosition;
             if (_tileEngine.PlaceTile(AssetManager.GetTexture("CoalTile"), position))
             {
-                _ = App.SendPacketTcp(new PlaceTilePacket() { Type = "place_tile", Username = _playerData.Username, TextureName = "CoalTile", X = position.X, Y = position.Y});
+                _ = App.SendPacketTcp(PacketId.PACKET_PLACE_TILE, new PlaceTilePacket() { Username = _playerData.Username, TextureName = "CoalTile", X = position.X, Y = position.Y});
             }
         }
     }
@@ -195,35 +195,36 @@ public class GamingState : GameState
         }
     }
 
-    public override void ForwardPacket(Packet packet, string json)
+    public override void ForwardPacket(byte id, string json)
     {
-        switch (packet.Type)
+        switch (id)
         {
-            case "update_pos":
+            case PacketId.PACKET_UPDATE_POS:
                 PositionUpdatePacket positionUpdatePacket = JsonSerializer.Deserialize<PositionUpdatePacket>(json)!;
                 _peersData![positionUpdatePacket.Username].X = positionUpdatePacket.X;
                 _peersData![positionUpdatePacket.Username].Y = positionUpdatePacket.Y;
                 break;
 
-            case "leave":
-                Console.WriteLine("Received leave packet from " + packet.Username);
-                SendChatMessage("", $"{packet.Username} has left the game");
-                _peersData!.Remove(packet.Username);
+            case PacketId.PACKET_LEAVE:
+                LeavePacket leavePacket = JsonSerializer.Deserialize<LeavePacket>(json)!;
+                Console.WriteLine("Received leave packet from " + leavePacket.Username);
+                SendChatMessage("", $"{leavePacket.Username} has left the game");
+                _peersData!.Remove(leavePacket.Username);
                 break;
 
-            case "ping":
+            case PacketId.PACKET_PING:
                 PingPacket pingPacket = JsonSerializer.Deserialize<PingPacket>(json)!;
                 SendChatMessage(pingPacket.Username, pingPacket.Message);
                 _chatCooldown = CHAT_BASE_COOLDOWN;
                 break;
 
-            case "place_tile":
+            case PacketId.PACKET_PLACE_TILE:
                 PlaceTilePacket placeTilePacket = JsonSerializer.Deserialize<PlaceTilePacket>(json)!;
                 _tileEngine.PlaceTile(AssetManager.GetTexture(placeTilePacket.TextureName), new Vector2(placeTilePacket.X, placeTilePacket.Y));
                 break;
         }
 
-        base.ForwardPacket(packet, json);
+        base.ForwardPacket(id, json);
     }
 
     private void SendChatMessage(string username, string message)

@@ -163,7 +163,7 @@ public class App : Application
                     Random random = new();
                     int seed = random.Next(100, 5000);
 
-                    SendPacketTcp(new StartGamePacket() { Type = "start_game", Username = stateFinishEventArgs.StateResult.PlayerData.Username, Seed = seed }).GetAwaiter().GetResult();
+                    SendPacketTcp(PacketId.PACKET_START_GAME, new StartGamePacket() { Username = stateFinishEventArgs.StateResult.PlayerData.Username, Seed = seed }).GetAwaiter().GetResult();
                     SetState(new GamingState(lobbyStateResult, seed));
                 }
             }
@@ -257,18 +257,21 @@ public class App : Application
 
 
 
-    // --- Fucking networking stuff ewww ---
+    // --- Fucking networking stuff ---
 
-    public static async Task SendPacketTcp<T>(T packet) where T : Packet
+    public static async Task SendPacketTcp<T>(byte id, T packet) where T : Packet
     {
         if (_networkStream == null) return;
-        _ = Task.Run(async () => _networkStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(packet) + "\n")));
+
+        ReadOnlyMemory<byte> buffer = new([id, .. Encoding.UTF8.GetBytes(JsonSerializer.Serialize(packet) + "\n")]);
+        _ = Task.Run(async () => _networkStream.WriteAsync(buffer));
     }
 
-    public static async Task SendPacketUdp<T>(T packet) where T : Packet
+    public static async Task SendPacketUdp<T>(byte id, T packet) where T : Packet
     {
         if (_udpClient == null) return;
-        byte[] data = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(packet));
+
+        byte[] data = [id, .. Encoding.UTF8.GetBytes(JsonSerializer.Serialize(packet))];
         await _udpClient.SendAsync(data, data.Length, _serverEndPoint);
     }
 
@@ -280,22 +283,23 @@ public class App : Application
         TcpClient tcpClient = new TcpClient(ip, 5000);
         NetworkStream networkStream = tcpClient.GetStream();
 
-        networkStream.Write(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new LoginPacket { Type = "login", Username = username })));
+        byte[] login = [PacketId.PACKET_LOGIN, .. Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new LoginPacket { Username = username }))];
+        networkStream.Write(login);
 
         byte[] connectionBuffer = new byte[2];
         int bytesRead = networkStream.Read(connectionBuffer);
 
-        if (connectionBuffer[0] != 00000000)
+        if (connectionBuffer[0] != 0x00)
         {
             Console.Write("Couldn't connect to server: ");
 
             switch (connectionBuffer[0])
             {
-                case 00000001:
+                case 0x01:
                     Console.WriteLine("User with the same name already exists");
                     break;
 
-                case 00000002:
+                case 0x02:
                     Console.WriteLine("Game has already been started");
                     break;
             }
@@ -306,13 +310,13 @@ public class App : Application
         }
         else
         {
-            bool host = connectionBuffer[1] == 00000001;
+            bool host = connectionBuffer[1] == 0x01;
 
             _networkStream = networkStream;
             
             _udpClient = new UdpClient(0);
             _serverEndPoint = new IPEndPoint(IPAddress.Parse(ip), 5000);
-            SendPacketUdp(new Packet { Type = "udp_init", Username = username }).GetAwaiter();
+            SendPacketUdp(PacketId.PACKET_UDP_INIT, new Packet { Username = username }).GetAwaiter();
 
             _ = Task.Run(async () => ReceivePackets(false));
             _ = Task.Run(async () => ReceivePackets(true));
@@ -374,10 +378,7 @@ public class App : Application
 
                 try
                 {
-                    Packet? packet = JsonSerializer.Deserialize<Packet>(line);
-
-                    if (packet != null)
-                        _currentState?.ForwardPacket(packet, line);
+                    _currentState?.ForwardPacket(Convert.ToByte(line[0]), line.Substring(1, line.Length - 1));
                 }
                 catch (Exception ex)
                 {

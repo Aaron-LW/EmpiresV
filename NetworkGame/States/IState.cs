@@ -7,5 +7,5 @@ public interface IState
     public void Render(Renderer renderer);
     public event EventHandler StateFinish;
 
-    public void ForwardPacket(Packet packet, string json);
+    public void ForwardPacket(byte id, string json);
 }
