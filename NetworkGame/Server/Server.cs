@@ -25,7 +25,9 @@ public class Server
 
         Console.Write("Starting UDP server...  ");
 
-        _udpServer = new UdpClient(5000);
+        _udpServer = new UdpClient(AddressFamily.InterNetworkV6);
+        _udpServer.Client.DualMode = true;
+        _udpServer.Client.Bind(new IPEndPoint(IPAddress.IPv6Any, 5000));
         _ = HandleUdp();
 
         Console.WriteLine("Success!");
@@ -186,6 +188,7 @@ public class Server
                 {
                     playerClient.UdpEndPoint = ((UdpReceiveResult)udpReceiveResult).RemoteEndPoint;
                     Console.WriteLine($"{playerClient.Username}'s Udp endpoint: {playerClient.UdpEndPoint}");
+                    Console.WriteLine($"{playerClient.Username}'s Udp Address family: {playerClient.UdpEndPoint.AddressFamily}");
                 }
 
                 break;

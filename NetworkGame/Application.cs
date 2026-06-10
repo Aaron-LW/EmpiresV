@@ -337,8 +337,11 @@ public class App : Application
 
             _networkStream = networkStream;
             
-            _udpClient = new UdpClient(0);
+            _udpClient = new UdpClient(AddressFamily.InterNetworkV6);
+            _udpClient.Client.DualMode = true;
+
             _serverEndPoint = new IPEndPoint(addresses[(int)connectedIndex!], 5000);
+
             SendPacketUdp(PacketId.PACKET_UDP_INIT, new Packet { Username = username }).GetAwaiter();
 
             _ = Task.Run(async () => ReceivePackets(false));
