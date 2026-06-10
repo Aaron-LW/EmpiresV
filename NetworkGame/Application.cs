@@ -281,10 +281,30 @@ public class App : Application
         Console.WriteLine("Trying to connect as " + username);
 
         IPAddress[] addresses = Dns.GetHostAddresses(ip);
-        Console.WriteLine(addresses[0]);
 
-        TcpClient tcpClient = new TcpClient(addresses[0].ToString(), 5000);
+        TcpClient? tcpClient = null;
+        int? connectedIndex = null;
+
+        for (int i = 0; i < addresses.Length; i++)
+        {
+            try
+            {
+                Console.WriteLine($"Trying to connect to {addresses[i]}");
+
+                tcpClient = new TcpClient(addresses[i].ToString(), 5000);
+                connectedIndex = i;
+
+                break;
+            }
+            catch (SocketException ex)
+            {
+                Console.WriteLine($"Connection failed on {addresses[i]}: {ex.Message}");
+            }
+        }
+
+        if (tcpClient == null || connectedIndex == null) throw new Exception("Couldn't connect to server: Server not found :(");
         NetworkStream networkStream = tcpClient.GetStream();
+
 
         byte[] login = [PacketId.PACKET_LOGIN, .. Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new LoginPacket { Username = username }))];
         networkStream.Write(login);
@@ -318,7 +338,7 @@ public class App : Application
             _networkStream = networkStream;
             
             _udpClient = new UdpClient(0);
-            _serverEndPoint = new IPEndPoint(addresses[0], 5000);
+            _serverEndPoint = new IPEndPoint(addresses[(int)connectedIndex!], 5000);
             SendPacketUdp(PacketId.PACKET_UDP_INIT, new Packet { Username = username }).GetAwaiter();
 
             _ = Task.Run(async () => ReceivePackets(false));

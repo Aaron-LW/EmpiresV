@@ -18,6 +18,7 @@ public class Server
 
         TcpListener server = new TcpListener(IPAddress.IPv6Any, 5000);
         server.Server.DualMode = true;
+
         server.Start();
 
         Console.WriteLine("Success!");
