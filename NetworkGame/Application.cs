@@ -7,7 +7,6 @@ using System.Text.Json;
 using SDL3;
 using Smash;
 using Smash.Graphics;
-using Smash.Input;
 using Color = System.Drawing.Color;
 
 public class App : Application 
@@ -105,8 +104,8 @@ public class App : Application
     {
         _currentState?.Render(_renderer);
 
-        string fpsText = $"Fps: {Math.Round(_fps)}";
-        //_renderer.RenderText(Font, fpsText, new Vector2(WindowWidth - Font.MeasureString(fpsText).X - 20, 20), Color.White);
+        string fpsText = $"Fps: {(int)_fps}";
+        _renderer.RenderText(Font, fpsText, new Vector2(WindowWidth - Font.MeasureString(fpsText).X - 20, 20), Color.White);
 
         _renderer.RenderPresent();
     }
