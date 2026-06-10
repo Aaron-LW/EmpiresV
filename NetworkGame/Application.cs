@@ -136,7 +136,7 @@ public class App : Application
                 {
                     (bool connected, bool host) = TryConnect(menuStateResult.PlayerData.Username, menuStateResult.Ip);
 
-                    Console.WriteLine($"Host: {host}");
+                    if (host) Console.WriteLine("You are the host!");
 
                     if (connected)
                     {
