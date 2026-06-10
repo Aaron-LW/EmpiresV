@@ -1,4 +1,3 @@
-using System.Dynamic;
 using Smash;
 using Smash.Input;
 
@@ -6,7 +5,7 @@ internal static class Program
 {
     public static bool TCPOnly { get; private set; } = false;
 
-    private static void Main(string[] args)
+    private static async Task Main(string[] args)
     {
         if (args.Contains("--tcp-only") || args.Contains("-to"))
         {
@@ -19,9 +18,8 @@ internal static class Program
             Console.WriteLine("Running as server");
 
             Server server = new Server();
-            Task.Run(async () => server.Main());
-
-            while (true) {}}
+            await server.Main();
+        }
         
         else
         {
@@ -33,7 +31,7 @@ internal static class Program
             application.Start();
 
             InputHandler.StartPollingTextInput();
-            
+
             while (!application.ApplicationShouldClose())
             {
                 SmashEngine.Update();
