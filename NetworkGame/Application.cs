@@ -280,7 +280,10 @@ public class App : Application
     {
         Console.WriteLine("Trying to connect as " + username);
 
-        TcpClient tcpClient = new TcpClient(ip, 5000);
+        IPAddress[] addresses = Dns.GetHostAddresses(ip);
+        Console.WriteLine(addresses[0]);
+
+        TcpClient tcpClient = new TcpClient(addresses[0].ToString(), 5000);
         NetworkStream networkStream = tcpClient.GetStream();
 
         byte[] login = [PacketId.PACKET_LOGIN, .. Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new LoginPacket { Username = username }))];
@@ -315,7 +318,7 @@ public class App : Application
             _networkStream = networkStream;
             
             _udpClient = new UdpClient(0);
-            _serverEndPoint = new IPEndPoint(IPAddress.Parse(ip), 5000);
+            _serverEndPoint = new IPEndPoint(addresses[0], 5000);
             SendPacketUdp(PacketId.PACKET_UDP_INIT, new Packet { Username = username }).GetAwaiter();
 
             _ = Task.Run(async () => ReceivePackets(false));

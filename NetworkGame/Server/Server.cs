@@ -118,7 +118,7 @@ public class Server
                         _clients.Remove(playerClient);
                     }
 
-                    if (_clients.Count == 0)
+                    if (_clients.Count == 0 && _gameStarted)
                     {
                         _gameStarted = false;
                         Console.WriteLine("All clients have disconnected; Resetting game");
