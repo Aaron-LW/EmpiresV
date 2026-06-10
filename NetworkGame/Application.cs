@@ -277,6 +277,7 @@ public class App : Application
     //(Could connect, is host)
     private (bool, bool) TryConnect(string username, string ip)
     {
+        ip = ip.Trim();
         Console.WriteLine("Trying to connect as " + username);
 
         IPAddress[] addresses = Dns.GetHostAddresses(ip);
