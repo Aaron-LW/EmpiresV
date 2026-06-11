@@ -1,6 +1,7 @@
 using Color = System.Drawing.Color;
 using System.Numerics;
 using Smash.Graphics;
+using SDL3;
 
 public class TileEngine
 {
@@ -86,7 +87,15 @@ public class TileEngine
                         chunk.RebuildChunk(renderer);
                     }
 
-                    renderer.RenderTexture(new Texture2D(chunk.RenderTarget, "lol"), (chunkPosition - offset) * _zoom, Color.White, _zoom);
+                    SDL.FRect dstRect = new()
+                    {
+                       X = (chunkPosition.X - offset.X) * _zoom,
+                       Y = (chunkPosition.Y - offset.Y) * _zoom,
+                       W = Chunk.CHUNK_PIXEL_WIDTH * _zoom,
+                       H = Chunk.CHUNK_PIXEL_HEIGHT * _zoom
+                    };
+
+                    SDL.RenderTexture(renderer.Handle, chunk.RenderTarget, IntPtr.Zero, dstRect);
                 }
             }
         }
@@ -129,8 +138,8 @@ public class TileEngine
 
     private Vector2 AlignToChunkGrid(Vector2 worldPosition)
     {
-        return new Vector2((int)MathF.Floor(worldPosition.X / Chunk.CHUNK_PIXEL_WIDTH) * Chunk.CHUNK_PIXEL_WIDTH,
-                           (int)MathF.Floor(worldPosition.Y / Chunk.CHUNK_PIXEL_HEIGHT) * Chunk.CHUNK_PIXEL_HEIGHT);
+        return new Vector2((int)Math.Floor(worldPosition.X / Chunk.CHUNK_PIXEL_WIDTH) * Chunk.CHUNK_PIXEL_WIDTH,
+                           (int)Math.Floor(worldPosition.Y / Chunk.CHUNK_PIXEL_HEIGHT) * Chunk.CHUNK_PIXEL_HEIGHT);
     }
 
     private (Vector2, Chunk) GetOrCreateChunk(Vector2 worldPosition)
