@@ -36,6 +36,7 @@ public class App : Application
     public App(bool autoconnect, bool autohost)
     {
         CreateWindowAndRenderer("Networkgame", 1080, 800, out _window, out _renderer);
+        _renderer.SetVSyncEnabled(true);
         _window.SetWindowResizable(true);
 
         AssetManager.SetDefaultScaleMode(ScaleMode.Nearest);
@@ -51,7 +52,6 @@ public class App : Application
         AssetManager.AddTextureRegion("mogus", new TextureRegion("TextureAtlas", 32, 0, 16, 16));
         AssetManager.AddTextureRegion("Selector", new TextureRegion("TextureAtlas", 0, 32, 16, 16));
 
-        _renderer.SetVSyncEnabled(false);
         _renderer.SetRenderBlendMode(BlendMode.Blend);
 
         string dataFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EmpiresV", "data.json");

@@ -5,15 +5,14 @@ using SDL3;
 using Smash;
 using Smash.Graphics;
 using Smash.Input;
-using System.Diagnostics;
 
 public class GamingState : GameState
 {
     public const int TILE_WIDTH = 16;
     public const int TILE_HEIGHT = 16;
 
-    private const int WORLD_WIDTH = 800;
-    private const int WORLD_HEIGHT = 800;
+    private const int WORLD_WIDTH = 500;
+    private const int WORLD_HEIGHT = 500;
 
     private const int CAMERA_SPEED = 1000;
 
@@ -55,10 +54,14 @@ public class GamingState : GameState
             _chatCooldown = CHAT_BASE_COOLDOWN;
         }
 
-        _backgroundTileEngine = new(WORLD_WIDTH, WORLD_HEIGHT, 1);
-        _backgroundTileEngine.GenerateWorld(worldSeed);
+        _backgroundTileEngine = new(WORLD_WIDTH, WORLD_HEIGHT, 1, worldSeed);
+        //_backgroundTileEngine.GenerateWorld();
 
-        _tileEngine = new(WORLD_WIDTH, WORLD_HEIGHT, 1);
+        _tileEngine = new(WORLD_WIDTH, WORLD_HEIGHT, 1, worldSeed);
+
+
+        _backgroundTileEngine.UpdateVisibleChunks(_cameraPosition, _preferredZoom);
+        _tileEngine.UpdateVisibleChunks(_cameraPosition, _preferredZoom);
     }
 
     public override void Update(double deltaTime)
@@ -68,6 +71,7 @@ public class GamingState : GameState
             _zoom = MathHelper.Lerp(_zoom, _preferredZoom, 30 * (float)deltaTime);
             _backgroundTileEngine.SetZoom(_zoom);
             _tileEngine.SetZoom(_zoom);
+
         }
 
         if (!_chatFocused)
@@ -132,17 +136,23 @@ public class GamingState : GameState
                 _ = App.SendPacketTcp(PacketId.PACKET_UPDATE_POS, new PositionUpdatePacket() { Username = _playerData.Username, X = _playerData.X, Y = _playerData.Y });
             else
                 _ = App.SendPacketUdp(PacketId.PACKET_UPDATE_POS, new PositionUpdatePacket() { Username = _playerData.Username, X = _playerData.X, Y = _playerData.Y });
+
+            _backgroundTileEngine.UpdateVisibleChunks(_cameraPosition, _preferredZoom);
+            _tileEngine.UpdateVisibleChunks(_cameraPosition, _preferredZoom);
         }
 
         if (InputHandler.ScrollWheelDelta != 0)
         {
-            _preferredZoom += InputHandler.ScrollWheelDelta / 10;
-            _preferredZoom = Math.Clamp(_preferredZoom, 0.2f, 2f);
+            _preferredZoom += InputHandler.ScrollWheelDelta / (20 / _zoom);
+            _preferredZoom = Math.Clamp(_preferredZoom, 0.08f, 2f);
+
+            _tileEngine.UpdateVisibleChunks(_cameraPosition, _preferredZoom);
+            _backgroundTileEngine.UpdateVisibleChunks(_cameraPosition, _preferredZoom);
         }
 
         if (InputHandler.IsMiddleMousePressed())
         {
-            _preferredZoom = 1;
+            _preferredZoom = 1.5f;
         }
 
         if (InputHandler.IsLeftMouseDown())
@@ -152,6 +162,8 @@ public class GamingState : GameState
             {
                 _ = App.SendPacketTcp(PacketId.PACKET_PLACE_TILE, new PlaceTilePacket() { Username = _playerData.Username, TextureName = "CoalTile", X = position.X, Y = position.Y});
             }
+
+            _backgroundTileEngine.PlaceChunk(_mouseWorldPos);
         }
 
         if (InputHandler.IsRightMouseDown())
@@ -171,7 +183,7 @@ public class GamingState : GameState
         _backgroundTileEngine.Render(renderer, _cameraPosition);
         _tileEngine.Render(renderer, _cameraPosition);
 
-        renderer.RenderTexture(AssetManager.GetTexture("Selector"), (_tileEngine.AlignToGrid(_mouseWorldPos) - _cameraPosition) * _zoom, Color.White, _zoom);
+        renderer.RenderTexture(AssetManager.GetTexture("Selector"), (TileEngine.AlignToGrid(_mouseWorldPos) - _cameraPosition) * _zoom, Color.White, _zoom);
 
         renderer.RenderTexture(AssetManager.GetTexture("mogus"), (_playerData.Position - _cameraPosition) * _zoom, Color.White, _zoom);
 
@@ -207,6 +219,9 @@ public class GamingState : GameState
             renderer.RenderFilledRectangle(new Rectangle(0, App.WindowHeight - CHAT_BAR_HEIGHT, App.WindowWidth, CHAT_BAR_HEIGHT), Color.FromArgb(CHAT_OPACITY, 0, 0, 0));
             renderer.RenderText(App.Font, _chatMessage, new Vector2(10, App.WindowHeight - CHAT_BAR_HEIGHT) + new Vector2(0, CHAT_BAR_HEIGHT / 2) - new Vector2(0, App.Font.MeasureString(_chatMessage).Y / 2), Color.White);
         }
+
+        Vector2 tilePosition = TileEngine.AlignToGrid(_mouseWorldPos);
+        renderer.RenderText(App.Font, tilePosition.ToString(), new Vector2(20), Color.White);
     }
 
     public override void ForwardPacket(byte id, string json)
