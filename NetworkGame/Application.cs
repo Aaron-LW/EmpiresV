@@ -14,6 +14,8 @@ public class App : Application
     public const int POINT_SIZE = 25;
     public static Font Font = null!;
 
+    public static Texture2D TextureAtlas { get; private set; } = null!;
+
     public static float WindowWidth => _window!.Width;
     public static float WindowHeight => _window!.Height;
 
@@ -42,7 +44,7 @@ public class App : Application
         AssetManager.LoadFont("Roboto.ttf");
         Font = AssetManager.GetFont("Roboto", POINT_SIZE);
 
-        AssetManager.LoadTexture("TextureAtlas.png", _renderer);
+        TextureAtlas = AssetManager.LoadTexture("TextureAtlas.png", _renderer);
         AssetManager.AddTextureRegion("HostCrown", new TextureRegion("TextureAtlas", 0, 0, 19, 15));
         AssetManager.AddTextureRegion("Grass", new TextureRegion("TextureAtlas", 0, 16, 16, 16));
         AssetManager.AddTextureRegion("CoalTile", new TextureRegion("TextureAtlas", 16, 16, 16, 16));

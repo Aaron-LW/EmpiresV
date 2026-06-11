@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Numerics;
 using SDL3;
 using Smash.Graphics;
@@ -28,11 +29,12 @@ public class Chunk
     {
         RecalculateVertices();
 
+        SDL.DestroyTexture(RenderTarget);
         RenderTarget = SDL.CreateTexture(renderer.Handle, SDL.PixelFormat.RGBA128Float, SDL.TextureAccess.Target, CHUNK_WIDHT * GamingState.TILE_WIDTH, CHUNK_HEIGHT * GamingState.TILE_HEIGHT);
         SDL.SetTextureScaleMode(RenderTarget, SDL.ScaleMode.Nearest);
 
         SDL.SetRenderTarget(renderer.Handle, RenderTarget);
-        SDL.RenderGeometry(renderer.Handle, AssetManager.GetTexture("TextureAtlas").Handle, _vertices, _vertices.Length, _indices, _indices.Length);
+        SDL.RenderGeometry(renderer.Handle, App.TextureAtlas.Handle, _vertices, _vertices.Length, _indices, _indices.Length);
         SDL.SetRenderTarget(renderer.Handle, IntPtr.Zero);
 
         Dirty = false;
@@ -68,7 +70,7 @@ public class Chunk
         _vertices = new SDL.Vertex[MAX_TILES * 4];
         int drawnTiles = 0;
 
-        Texture2D textureAtlas = AssetManager.GetTexture("TextureAtlas");
+        Texture2D textureAtlas = App.TextureAtlas;
 
         float texWidth = 16f / (float)textureAtlas.Width;
         float texHeight = 16f / (float)textureAtlas.Height;
@@ -117,7 +119,6 @@ public class Chunk
 
     private void FillBuffers()
     {
-        //_vertices = new SDL.Vertex[MAX_TILES * 4];
         _indices = new int[MAX_TILES * 6];
 
         for (int i = 0; i < MAX_TILES; i++)

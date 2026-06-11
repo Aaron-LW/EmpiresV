@@ -5,6 +5,7 @@ using SDL3;
 using Smash;
 using Smash.Graphics;
 using Smash.Input;
+using System.Diagnostics;
 
 public class GamingState : GameState
 {

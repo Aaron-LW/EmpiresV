@@ -1,8 +1,6 @@
 using Color = System.Drawing.Color;
 using System.Numerics;
 using Smash.Graphics;
-using Smash;
-using System.Diagnostics;
 
 public class TileEngine
 {
