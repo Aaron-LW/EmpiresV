@@ -47,9 +47,9 @@ public class App : Application
         AssetManager.AddTextureRegion("Grass", new TextureRegion("TextureAtlas", 0, 16, 16, 16));
         AssetManager.AddTextureRegion("CoalTile", new TextureRegion("TextureAtlas", 16, 16, 16, 16));
         AssetManager.AddTextureRegion("mogus", new TextureRegion("TextureAtlas", 32, 0, 16, 16));
-        AssetManager.AddTextureRegion("Geyser", new TextureRegion("TextureAtlas", 0, 32, 16, 16));
+        AssetManager.AddTextureRegion("Selector", new TextureRegion("TextureAtlas", 0, 32, 16, 16));
 
-        _renderer.SetVSyncEnabled(true);
+        _renderer.SetVSyncEnabled(false);
         _renderer.SetRenderBlendMode(BlendMode.Blend);
 
         string dataFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EmpiresV", "data.json");
@@ -91,7 +91,7 @@ public class App : Application
     public override void Update(double deltaTime) 
     {
         _elapsedTime += (float)deltaTime;
-        if (_elapsedTime > 0.5f)
+        if (_elapsedTime > 0.1f)
         {
             _fps = 1f / deltaTime;
             _elapsedTime = 0f;
@@ -399,7 +399,7 @@ public class App : Application
                 string full = stringBuilder.ToString();
                 int index = full.IndexOf("\n");
 
-                string line = full.Substring(0, index).Trim();
+                string line = full.Substring(0, index);
                 stringBuilder.Remove(0, index + 1);
 
                 try

@@ -32,6 +32,8 @@ public class GamingState : GameState
     private float _cameraY;
     private Vector2 _cameraPosition => new Vector2(_cameraX, _cameraY);
 
+    private Vector2 _mouseWorldPos => InputHandler.MousePosition / _zoom + _cameraPosition;
+
     private PlayerData _playerData;
     private Dictionary<string, PlayerData>? _peersData;
 
@@ -142,12 +144,21 @@ public class GamingState : GameState
             _preferredZoom = 1;
         }
 
-        if (InputHandler.IsLeftMousePressed())
+        if (InputHandler.IsLeftMouseDown())
         {
             Vector2 position = InputHandler.MousePosition / _zoom + _cameraPosition;
             if (_tileEngine.PlaceTile(AssetManager.GetTexture("CoalTile"), position))
             {
                 _ = App.SendPacketTcp(PacketId.PACKET_PLACE_TILE, new PlaceTilePacket() { Username = _playerData.Username, TextureName = "CoalTile", X = position.X, Y = position.Y});
+            }
+        }
+
+        if (InputHandler.IsRightMouseDown())
+        {
+            Vector2 mousePos = _mouseWorldPos;
+            if (_tileEngine.RemoveTile(mousePos))
+            {
+                _ = App.SendPacketTcp(PacketId.PACKET_REMOVE_TILE, new RemoveTilePacket() { Username = _playerData.Username, X = mousePos.X, Y = mousePos.Y });
             }
         }
     }
@@ -158,6 +169,8 @@ public class GamingState : GameState
 
         _backgroundTileEngine.Render(renderer, _cameraPosition);
         _tileEngine.Render(renderer, _cameraPosition);
+
+        renderer.RenderTexture(AssetManager.GetTexture("Selector"), (_tileEngine.AlignToGrid(_mouseWorldPos) - _cameraPosition) * _zoom, Color.White, _zoom);
 
         renderer.RenderTexture(AssetManager.GetTexture("mogus"), (_playerData.Position - _cameraPosition) * _zoom, Color.White, _zoom);
 
@@ -221,6 +234,11 @@ public class GamingState : GameState
             case PacketId.PACKET_PLACE_TILE:
                 PlaceTilePacket placeTilePacket = JsonSerializer.Deserialize<PlaceTilePacket>(json)!;
                 _tileEngine.PlaceTile(AssetManager.GetTexture(placeTilePacket.TextureName), new Vector2(placeTilePacket.X, placeTilePacket.Y));
+                break;
+
+            case PacketId.PACKET_REMOVE_TILE:
+                RemoveTilePacket removeTilePacket = JsonSerializer.Deserialize<RemoveTilePacket>(json)!;
+                _tileEngine.RemoveTile(new Vector2(removeTilePacket.X, removeTilePacket.Y));
                 break;
         }
 

@@ -27,6 +27,7 @@ public class Chunk
     public void RebuildChunk(Renderer renderer)
     {
         RecalculateVertices();
+
         RenderTarget = SDL.CreateTexture(renderer.Handle, SDL.PixelFormat.RGBA128Float, SDL.TextureAccess.Target, CHUNK_WIDHT * GamingState.TILE_WIDTH, CHUNK_HEIGHT * GamingState.TILE_HEIGHT);
         SDL.SetTextureScaleMode(RenderTarget, SDL.ScaleMode.Nearest);
 
@@ -44,12 +45,27 @@ public class Chunk
         if (_tiles[tileY * CHUNK_WIDHT + tileX] != null) return false;
 
         _tiles[tileY * CHUNK_WIDHT + tileX] = new Tile(tileX * GamingState.TILE_WIDTH, tileY * GamingState.TILE_HEIGHT, texture, brightness);
+
+        Dirty = true;
+        return true;
+    }
+
+    public bool RemoveTileAt(Vector2 chunkPosition)
+    {
+        int tileX = (int)MathF.Floor(chunkPosition.X / GamingState.TILE_WIDTH);
+        int tileY = (int)MathF.Floor(chunkPosition.Y / GamingState.TILE_HEIGHT);
+
+        if (_tiles[tileY * CHUNK_WIDHT + tileX] == null) return false;
+
+        _tiles[tileY * CHUNK_WIDHT + tileX] = null!;
+
         Dirty = true;
         return true;
     }
 
     private void RecalculateVertices()
     {
+        _vertices = new SDL.Vertex[MAX_TILES * 4];
         int drawnTiles = 0;
 
         Texture2D textureAtlas = AssetManager.GetTexture("TextureAtlas");
@@ -101,7 +117,7 @@ public class Chunk
 
     private void FillBuffers()
     {
-        _vertices = new SDL.Vertex[MAX_TILES * 4];
+        //_vertices = new SDL.Vertex[MAX_TILES * 4];
         _indices = new int[MAX_TILES * 6];
 
         for (int i = 0; i < MAX_TILES; i++)

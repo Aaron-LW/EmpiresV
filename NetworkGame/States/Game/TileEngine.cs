@@ -1,6 +1,8 @@
-using System.Drawing;
+using Color = System.Drawing.Color;
 using System.Numerics;
 using Smash.Graphics;
+using Smash;
+using System.Diagnostics;
 
 public class TileEngine
 {
@@ -77,6 +79,7 @@ public class TileEngine
             for (float x = startPos.X; x < pixelsX; x += Chunk.CHUNK_PIXEL_WIDTH)
             {
                 Vector2 chunkPosition = AlignToChunkGrid(new Vector2(x, y));
+                //renderer.RenderRectangle(new Rectangle((chunkPosition - offset) * _zoom, new Vector2(Chunk.CHUNK_PIXEL_WIDTH * _zoom)), Color.Red);
                     
                 if (_chunks.TryGetValue(chunkPosition, out Chunk? chunk))
                 {
@@ -107,7 +110,20 @@ public class TileEngine
         return true;
     }
 
-    private Vector2 AlignToGrid(Vector2 worldPosition)
+    public bool RemoveTile(Vector2 worldPosition)
+    {
+        (Vector2 chunkPos, Chunk chunk) = GetOrCreateChunk(worldPosition);
+
+        float chunkX = worldPosition.X - chunkPos.X;
+        float chunkY = worldPosition.Y - chunkPos.Y;
+
+        if (!chunk.RemoveTileAt(new Vector2(chunkX, chunkY)))
+            return false;
+
+        return true;
+    }
+
+    public Vector2 AlignToGrid(Vector2 worldPosition)
     {
         return new Vector2((int)MathF.Floor(worldPosition.X / GamingState.TILE_WIDTH) * GamingState.TILE_WIDTH,
                            (int)MathF.Floor(worldPosition.Y / GamingState.TILE_HEIGHT) * GamingState.TILE_WIDTH);

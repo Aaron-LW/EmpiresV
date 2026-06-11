@@ -91,7 +91,7 @@ public class MenuState : GameState
             {
                 if (_ipField.Text == string.Empty || _ipField.Text == null)
                 {
-                    OnStateFinish(new MenuStateResult() { Ip = "127.0.0.1", Type = "menu", PlayerData = new() { Username = _usernameField.Text!, Host = _hostServer } });
+                    OnStateFinish(new MenuStateResult() { Ip = "localhost", Type = "menu", PlayerData = new() { Username = _usernameField.Text!, Host = _hostServer } });
                 }
                 else if (_usernameField.Text != string.Empty && _usernameField.Text != null)
                 {
@@ -104,7 +104,7 @@ public class MenuState : GameState
                 if (_usernameField.Text != string.Empty && _usernameField.Text != null)
                 {
                     _hostServer = true;
-                    OnStateFinish(new MenuStateResult() { Ip = "127.0.0.1", Type = "menu", PlayerData = new() { Username = _usernameField.Text, Host = _hostServer } });
+                    OnStateFinish(new MenuStateResult() { Ip = "localhost", Type = "menu", PlayerData = new() { Username = _usernameField.Text, Host = _hostServer } });
                 }
             }
         }

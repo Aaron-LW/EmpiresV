@@ -138,7 +138,7 @@ public class Server
                     string full = stringBuilder.ToString();
                     int index = full.IndexOf("\n");
 
-                    string line = full.Substring(0, index).Trim();
+                    string line = full.Substring(0, index);
                     stringBuilder.Remove(0, index + 1);
 
                     await HandlePacket(Convert.ToByte(line[0]), line.Substring(1, line.Length - 1), playerClient);
@@ -190,7 +190,11 @@ public class Server
                     Console.WriteLine($"{playerClient.Username}'s Udp endpoint: {playerClient.UdpEndPoint}");
                     Console.WriteLine($"{playerClient.Username}'s Udp Address family: {playerClient.UdpEndPoint.AddressFamily}");
                 }
+                break;
 
+            case PacketId.PACKET_REMOVE_TILE:
+                RemoveTilePacket removeTilePacket = JsonSerializer.Deserialize<RemoveTilePacket>(json)!;
+                await BroadCastPacketTcp(PacketId.PACKET_REMOVE_TILE, removeTilePacket);
                 break;
         }
     }
