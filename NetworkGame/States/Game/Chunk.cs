@@ -20,17 +20,12 @@ public class Chunk
     private SDL.Vertex[] _vertices = [];
     private int[] _indices = [];
 
-    public Chunk()
-    {
-        FillBuffers();
-    }
-
     public void RebuildChunk(Renderer renderer)
     {
         RecalculateVertices();
-
+        
         SDL.DestroyTexture(RenderTarget);
-        RenderTarget = SDL.CreateTexture(renderer.Handle, SDL.PixelFormat.RGBA128Float, SDL.TextureAccess.Target, CHUNK_WIDHT * GamingState.TILE_WIDTH, CHUNK_HEIGHT * GamingState.TILE_HEIGHT);
+        RenderTarget = SDL.CreateTexture(renderer.Handle, SDL.PixelFormat.RGBA8888, SDL.TextureAccess.Target, CHUNK_WIDHT * GamingState.TILE_WIDTH, CHUNK_HEIGHT * GamingState.TILE_HEIGHT);
         SDL.SetTextureScaleMode(RenderTarget, SDL.ScaleMode.Nearest);
 
         SDL.SetRenderTarget(renderer.Handle, RenderTarget);
@@ -38,6 +33,14 @@ public class Chunk
         SDL.SetRenderTarget(renderer.Handle, IntPtr.Zero);
 
         Dirty = false;
+        _vertices = [];
+    }
+
+    public void DestroyRenderTarget()
+    {
+        SDL.DestroyTexture(RenderTarget);
+        RenderTarget = 0;
+        Dirty = true;
     }
 
     public bool PlaceTileAt(Vector2 chunkPosition, Texture2D texture, float brightness)
@@ -65,9 +68,11 @@ public class Chunk
         return true;
     }
 
-    private void RecalculateVertices()
+    public void RecalculateVertices()
     {
-        _vertices = new SDL.Vertex[MAX_TILES * 4];
+        List<SDL.Vertex> vertices = new();
+        List<int> indices = new();
+
         int drawnTiles = 0;
 
         Texture2D textureAtlas = App.TextureAtlas;
@@ -82,54 +87,79 @@ public class Chunk
                 Tile? tile = _tiles[y * CHUNK_WIDHT + x];
                 if (tile == null) continue;
 
-                int baseIndex = drawnTiles * 4;
+                SDL.FColor topVertexColor = new SDL.FColor { R = tile.Brightness, G = tile.Brightness, B = tile.Brightness, A = 1.0f };
 
                 //Positions
-                _vertices[baseIndex + 0].Position.X = tile.X;
-                _vertices[baseIndex + 0].Position.Y = tile.Y;
+                vertices.Add(new SDL.Vertex() { Position = new SDL.FPoint() { X = tile.X, Y = tile.Y },
+                                                Color = topVertexColor, 
+                                                TexCoord = new SDL.FPoint { X = tile.TexX, Y = tile.TexY }});
 
-                _vertices[baseIndex + 1].Position.X = tile.X + GamingState.TILE_WIDTH;
-                _vertices[baseIndex + 1].Position.Y = tile.Y;
+                vertices.Add(new SDL.Vertex() { Position = new SDL.FPoint() { X = tile.X + GamingState.TILE_WIDTH, Y = tile.Y },
+                                                Color = topVertexColor,
+                                                TexCoord = new SDL.FPoint { X = tile.TexX + texWidth, Y = tile.TexY }});
 
-                _vertices[baseIndex + 2].Position.X = tile.X + GamingState.TILE_WIDTH;
-                _vertices[baseIndex + 2].Position.Y = tile.Y + GamingState.TILE_HEIGHT;
+                vertices.Add(new SDL.Vertex() { Position = new SDL.FPoint() { X = tile.X + GamingState.TILE_WIDTH, Y = tile.Y + GamingState.TILE_HEIGHT },
+                                                Color = topVertexColor,
+                                                TexCoord = new SDL.FPoint { X = tile.TexX + texWidth, Y = tile.TexY + texHeight }});
 
-                _vertices[baseIndex + 3].Position.X = tile.X;
-                _vertices[baseIndex + 3].Position.Y = tile.Y + GamingState.TILE_HEIGHT;
+                vertices.Add(new SDL.Vertex() { Position = new SDL.FPoint() { X = tile.X, Y = tile.Y + GamingState.TILE_HEIGHT },
+                                                 Color = topVertexColor,
+                                                 TexCoord = new SDL.FPoint { X = tile.TexX, Y = tile.TexY + texHeight }});
 
-                SDL.FColor topVertexColor = new SDL.FColor { R = tile.Brightness, G = tile.Brightness, B = tile.Brightness, A = 1.0f };
-                SDL.FColor bottomVertexColor = new SDL.FColor { R = tile.Brightness, G = tile.Brightness, B = tile.Brightness, A = 1.0f};
+                int baseIndex = drawnTiles * 4;
+                indices.AddRange(baseIndex + 0,
+                                 baseIndex + 1,
+                                 baseIndex + 2,
+                                 baseIndex + 0,
+                                 baseIndex + 2,
+                                 baseIndex + 3);
 
-                //Color
-                _vertices[baseIndex + 0].Color = topVertexColor;
-                _vertices[baseIndex + 1].Color = topVertexColor;
-                _vertices[baseIndex + 2].Color = bottomVertexColor;
-                _vertices[baseIndex + 3].Color = bottomVertexColor;
+                //_vertices[baseIndex + 0].Position.X = tile.X;
+                //_vertices[baseIndex + 0].Position.Y = tile.Y;
 
-                //TexCoords
-                _vertices[baseIndex + 0].TexCoord = new SDL.FPoint { X = tile.TexX,            Y = tile.TexY};
-                _vertices[baseIndex + 1].TexCoord = new SDL.FPoint { X = tile.TexX + texWidth, Y = tile.TexY};
-                _vertices[baseIndex + 2].TexCoord = new SDL.FPoint { X = tile.TexX + texWidth, Y = tile.TexY + texHeight};
-                _vertices[baseIndex + 3].TexCoord = new SDL.FPoint { X = tile.TexX,            Y = tile.TexY + texHeight};
+                //_vertices[baseIndex + 1].Position.X = tile.X + GamingState.TILE_WIDTH;
+                //_vertices[baseIndex + 1].Position.Y = tile.Y;
+
+                //_vertices[baseIndex + 2].Position.X = tile.X + GamingState.TILE_WIDTH;
+                //_vertices[baseIndex + 2].Position.Y = tile.Y + GamingState.TILE_HEIGHT;
+
+                //_vertices[baseIndex + 3].Position.X = tile.X;
+                //_vertices[baseIndex + 3].Position.Y = tile.Y + GamingState.TILE_HEIGHT;
+
+
+                ////Color
+                //_vertices[baseIndex + 0].Color = topVertexColor;
+                //_vertices[baseIndex + 1].Color = topVertexColor;
+                //_vertices[baseIndex + 2].Color = bottomVertexColor;
+                //_vertices[baseIndex + 3].Color = bottomVertexColor;
+
+                ////TexCoords
+                //_vertices[baseIndex + 0].TexCoord = new SDL.FPoint { X = tile.TexX,            Y = tile.TexY};
+                //_vertices[baseIndex + 1].TexCoord = new SDL.FPoint { X = tile.TexX + texWidth, Y = tile.TexY};
+                //_vertices[baseIndex + 2].TexCoord = new SDL.FPoint { X = tile.TexX + texWidth, Y = tile.TexY + texHeight};
+                //_vertices[baseIndex + 3].TexCoord = new SDL.FPoint { X = tile.TexX,            Y = tile.TexY + texHeight};
 
                 drawnTiles++;
             }
         }
+
+        _vertices = vertices.ToArray();
+        _indices = indices.ToArray();
     }
 
-    private void FillBuffers()
-    {
-        _indices = new int[MAX_TILES * 6];
+    //private void FillBuffers()
+    //{
+    //    _indices = new int[MAX_TILES * 6];
 
-        for (int i = 0; i < MAX_TILES; i++)
-        {
-            int baseIndex = i * 4;
-            _indices[i * 6 + 0] = baseIndex + 0;
-            _indices[i * 6 + 1] = baseIndex + 1;
-            _indices[i * 6 + 2] = baseIndex + 2;
-            _indices[i * 6 + 3] = baseIndex + 0;
-            _indices[i * 6 + 4] = baseIndex + 2;
-            _indices[i * 6 + 5] = baseIndex + 3;
-        }
-    }
+    //    for (int i = 0; i < MAX_TILES; i++)
+    //    {
+    //        int baseIndex = i * 4;
+    //        _indices[i * 6 + 0] = baseIndex + 0;
+    //        _indices[i * 6 + 1] = baseIndex + 1;
+    //        _indices[i * 6 + 2] = baseIndex + 2;
+    //        _indices[i * 6 + 3] = baseIndex + 0;
+    //        _indices[i * 6 + 4] = baseIndex + 2;
+    //        _indices[i * 6 + 5] = baseIndex + 3;
+    //    }
+    //}
 }

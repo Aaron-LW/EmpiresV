@@ -5,6 +5,8 @@ using SDL3;
 using Smash;
 using Smash.Graphics;
 using Smash.Input;
+using System.Diagnostics;
+using System.Runtime.Intrinsics;
 
 public class GamingState : GameState
 {
@@ -41,6 +43,9 @@ public class GamingState : GameState
     private float _chatCooldown;
     private string _chatMessage = "";
 
+    private float _elapsedTime;
+    private long _ramUsage;
+
     private List<(string username, string message)> _chatHistory = new();
 
     public GamingState(StateResult previousStateResult, int worldSeed) : base(previousStateResult)
@@ -54,21 +59,28 @@ public class GamingState : GameState
             _chatCooldown = CHAT_BASE_COOLDOWN;
         }
 
-        _backgroundTileEngine = new(WORLD_WIDTH, WORLD_HEIGHT, 1, worldSeed);
-        //_backgroundTileEngine.GenerateWorld();
+        _backgroundTileEngine = new(WORLD_WIDTH, WORLD_HEIGHT, 1, worldSeed, true);
+        _tileEngine = new(WORLD_WIDTH, WORLD_HEIGHT, 1, worldSeed, false);
 
-        _tileEngine = new(WORLD_WIDTH, WORLD_HEIGHT, 1, worldSeed);
-
-
-        _backgroundTileEngine.UpdateVisibleChunks(_cameraPosition, _preferredZoom);
-        _tileEngine.UpdateVisibleChunks(_cameraPosition, _preferredZoom);
+        _backgroundTileEngine.UpdateVisibleChunks(new Vector2(), 1);
+        _tileEngine.UpdateVisibleChunks(new Vector2(), 1);
     }
 
     public override void Update(double deltaTime)
     {
+        _elapsedTime += (float)deltaTime;
+        if (_elapsedTime > 2f)
+        {
+            Process currentProcess = Process.GetCurrentProcess();
+            _ramUsage = currentProcess.WorkingSet64 / 1024 / 1024;
+            _elapsedTime = 0;
+        }
+
         if (_preferredZoom != _zoom)
         {
-            _zoom = MathHelper.Lerp(_zoom, _preferredZoom, 30 * (float)deltaTime);
+            //_zoom = MathHelper.Lerp(_zoom, _preferredZoom, 30 * (float)deltaTime);
+            _zoom = _preferredZoom;
+
             _backgroundTileEngine.SetZoom(_zoom);
             _tileEngine.SetZoom(_zoom);
 
@@ -143,16 +155,22 @@ public class GamingState : GameState
 
         if (InputHandler.ScrollWheelDelta != 0)
         {
+            float previousZoom = _preferredZoom;
+
             _preferredZoom += InputHandler.ScrollWheelDelta / (20 / _zoom);
             _preferredZoom = Math.Clamp(_preferredZoom, 0.08f, 2f);
 
-            _tileEngine.UpdateVisibleChunks(_cameraPosition, _preferredZoom);
-            _backgroundTileEngine.UpdateVisibleChunks(_cameraPosition, _preferredZoom);
+            float greaterZoom = Math.Min(previousZoom, _preferredZoom);
+            _tileEngine.UpdateVisibleChunks(_cameraPosition, greaterZoom);
+            _backgroundTileEngine.UpdateVisibleChunks(_cameraPosition, greaterZoom);
         }
 
         if (InputHandler.IsMiddleMousePressed())
         {
             _preferredZoom = 1.5f;
+
+            _tileEngine.UpdateVisibleChunks(_cameraPosition, _preferredZoom);
+            _backgroundTileEngine.UpdateVisibleChunks(_cameraPosition, _preferredZoom);
         }
 
         if (InputHandler.IsLeftMouseDown())
@@ -162,8 +180,6 @@ public class GamingState : GameState
             {
                 _ = App.SendPacketTcp(PacketId.PACKET_PLACE_TILE, new PlaceTilePacket() { Username = _playerData.Username, TextureName = "CoalTile", X = position.X, Y = position.Y});
             }
-
-            _backgroundTileEngine.PlaceChunk(_mouseWorldPos);
         }
 
         if (InputHandler.IsRightMouseDown())
@@ -183,7 +199,8 @@ public class GamingState : GameState
         _backgroundTileEngine.Render(renderer, _cameraPosition);
         _tileEngine.Render(renderer, _cameraPosition);
 
-        renderer.RenderTexture(AssetManager.GetTexture("Selector"), (TileEngine.AlignToGrid(_mouseWorldPos) - _cameraPosition) * _zoom, Color.White, _zoom);
+        (int x, int y) selectorPos = TileEngine.AlignToGrid((int)_mouseWorldPos.X, (int)_mouseWorldPos.Y);
+        renderer.RenderTexture(AssetManager.GetTexture("Selector"), (new Vector2(selectorPos.x, selectorPos.y) - _cameraPosition) * _zoom, Color.White, _zoom);
 
         renderer.RenderTexture(AssetManager.GetTexture("mogus"), (_playerData.Position - _cameraPosition) * _zoom, Color.White, _zoom);
 
@@ -220,8 +237,9 @@ public class GamingState : GameState
             renderer.RenderText(App.Font, _chatMessage, new Vector2(10, App.WindowHeight - CHAT_BAR_HEIGHT) + new Vector2(0, CHAT_BAR_HEIGHT / 2) - new Vector2(0, App.Font.MeasureString(_chatMessage).Y / 2), Color.White);
         }
 
-        Vector2 tilePosition = TileEngine.AlignToGrid(_mouseWorldPos);
-        renderer.RenderText(App.Font, tilePosition.ToString(), new Vector2(20), Color.White);
+        renderer.RenderText(App.Font, $"RAM: {_ramUsage} MB", new Vector2(20, 20), Color.White);
+        renderer.RenderText(App.Font, $"Chunks: {_backgroundTileEngine.GetChunkAmount()}", new Vector2(20, 60), Color.White);
+        renderer.RenderText(App.Font, $"Visible Chunks: {_backgroundTileEngine.GetVisibleChunkAmount()}", new Vector2(20, 100), Color.White);
     }
 
     public override void ForwardPacket(byte id, string json)

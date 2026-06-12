@@ -36,7 +36,6 @@ public class App : Application
     public App(bool autoconnect, bool autohost)
     {
         CreateWindowAndRenderer("Networkgame", 1080, 800, out _window, out _renderer);
-        _renderer.SetVSyncEnabled(true);
         _window.SetWindowResizable(true);
 
         AssetManager.SetDefaultScaleMode(ScaleMode.Nearest);
@@ -45,13 +44,16 @@ public class App : Application
         AssetManager.LoadFont("Roboto.ttf");
         Font = AssetManager.GetFont("Roboto", POINT_SIZE);
 
-        TextureAtlas = AssetManager.LoadTexture("TextureAtlas.png", _renderer);
+        AssetManager.LoadTexture("TextureAtlas.png", _renderer);
         AssetManager.AddTextureRegion("HostCrown", new TextureRegion("TextureAtlas", 0, 0, 19, 15));
         AssetManager.AddTextureRegion("Grass", new TextureRegion("TextureAtlas", 0, 16, 16, 16));
         AssetManager.AddTextureRegion("CoalTile", new TextureRegion("TextureAtlas", 16, 16, 16, 16));
         AssetManager.AddTextureRegion("mogus", new TextureRegion("TextureAtlas", 32, 0, 16, 16));
         AssetManager.AddTextureRegion("Selector", new TextureRegion("TextureAtlas", 0, 32, 16, 16));
 
+        TextureAtlas = AssetManager.GetTexture("TextureAtlas");
+
+        _renderer.SetVSyncEnabled(false);
         _renderer.SetRenderBlendMode(BlendMode.Blend);
 
         string dataFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EmpiresV", "data.json");

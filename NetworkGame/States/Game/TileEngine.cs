@@ -3,22 +3,29 @@ using System.Numerics;
 using Smash.Graphics;
 using SDL3;
 using Smash;
-using System.Diagnostics;
+using System.Collections.Concurrent;
+using System.Globalization;
 
 public class TileEngine
 {
+    private readonly bool _generateChunks;
+
     private readonly int _mapWidth;
     private readonly int _mapHeight;
 
     private float _zoom = 1;
 
-    private Dictionary<Vector2, Chunk> _chunks = new();
-    private List<(Vector2, Chunk)> _visibleChunks = new();
+    private ConcurrentDictionary<(int x, int y), Chunk> _chunks = new();
+    private List<(int x, int y)> _visibleChunks = new();
+
+    private readonly object _generatingChunksLock = new();
+    private readonly HashSet<(int x, int y)> _generatingChunks = new();
 
     private FastNoiseLite _noise;
 
-    public TileEngine(int mapWidth, int mapHeight, float baseZoom, int seed)
+    public TileEngine(int mapWidth, int mapHeight, float baseZoom, int seed, bool generateChunks)
     {
+        _generateChunks = generateChunks;
         _zoom = baseZoom;
 
         _mapWidth = mapWidth;
@@ -46,12 +53,12 @@ public class TileEngine
                 if (noiseValue < 0.65f) brightness = 0.65f;
                 if (noiseValue < 0.4f) brightness = 0.4f;
 
-                (Vector2 chunkPos, Chunk chunk) = GetOrCreateChunk(new Vector2(x * GamingState.TILE_WIDTH, y * GamingState.TILE_HEIGHT));
+                ((int chunkX, int chunkY), Chunk chunk) = GetOrCreateChunk(x * GamingState.TILE_WIDTH, y * GamingState.TILE_HEIGHT);
 
-                int chunkX = x * GamingState.TILE_WIDTH - (int)chunkPos.X;
-                int chunkY = y * GamingState.TILE_HEIGHT - (int)chunkPos.Y;
+                int localChunkX = x * GamingState.TILE_WIDTH - chunkX;
+                int localChunkY = y * GamingState.TILE_HEIGHT - chunkY;
 
-                chunk.PlaceTileAt(new Vector2(chunkX, chunkY), AssetManager.GetTexture("Grass"), brightness);
+                chunk.PlaceTileAt(new Vector2(localChunkX, localChunkY), AssetManager.GetTexture("Grass"), brightness);
             }
         }
     }
@@ -64,38 +71,65 @@ public class TileEngine
 
         for (int i = 0; i < oreAmount; i++)
         {
-            float oreX = random.Next(0, _mapWidth * GamingState.TILE_WIDTH);
-            float oreY = random.Next(0, _mapHeight * GamingState.TILE_HEIGHT);
+            int oreX = random.Next(0, _mapWidth * GamingState.TILE_WIDTH);
+            int oreY = random.Next(0, _mapHeight * GamingState.TILE_HEIGHT);
 
-            PlaceTile(AssetManager.GetTexture("CoalTile"), AlignToGrid(new Vector2(oreX, oreY)));
+            (int x, int y) tilePos = AlignToGrid(oreX, oreY);
+            PlaceTile(AssetManager.GetTexture("CoalTile"), new Vector2(tilePos.x, tilePos.y));
         }
     }
 
     public void UpdateVisibleChunks(Vector2 offset, float zoom)
     {
-        _visibleChunks.Clear();
-        Vector2 startPos = AlignToChunkGrid(offset) - new Vector2(Chunk.CHUNK_PIXEL_WIDTH);
+        List<(int nx, int ny)> newChunks = new();
+        (int sx, int sy) startPos = AlignToChunkGrid((int)offset.X - Chunk.CHUNK_PIXEL_WIDTH * 2, (int)offset.Y - Chunk.CHUNK_PIXEL_HEIGHT * 2);
 
-        float pixelsX = startPos.X + ((App.WindowWidth + Chunk.CHUNK_PIXEL_WIDTH * 3) / zoom);
-        float pixelsY = startPos.Y + ((App.WindowHeight + Chunk.CHUNK_PIXEL_HEIGHT * 3) / zoom);
+        float pixelsX = startPos.sx + (App.WindowWidth / zoom) + (Chunk.CHUNK_PIXEL_WIDTH * 3);
+        float pixelsY = startPos.sy + (App.WindowHeight / zoom) + (Chunk.CHUNK_PIXEL_HEIGHT * 3);
 
-        for (float y = startPos.Y; y < pixelsY; y += Chunk.CHUNK_PIXEL_HEIGHT)
+        for (int y = startPos.sy; y < pixelsY; y += Chunk.CHUNK_PIXEL_HEIGHT)
         {
-            for (float x = startPos.X; x < pixelsX; x += Chunk.CHUNK_PIXEL_WIDTH)
+            for (int x = startPos.sx; x < pixelsX; x += Chunk.CHUNK_PIXEL_WIDTH)
             {
-                Vector2 chunkPosition = new Vector2(x, y);
-                if (_chunks.TryGetValue(chunkPosition, out Chunk? chunk))
+                if (_chunks.ContainsKey((x, y)))
                 {
-                    _visibleChunks.Add((chunkPosition, chunk));
+                    newChunks.Add((x, y));
+                }
+                else if (_generateChunks)
+                {
+                    lock (_generatingChunksLock)
+                    {
+                        if (!_generatingChunks.Contains((x, y)))
+                        {
+                            _generatingChunks.Add((x, y));
+
+                            int chunkX = x;
+                            int chunkY = y;
+
+                            Task.Run(async () => GenerateChunkAsync(chunkX, chunkY));
+                        }
+                    }
                 }
             }
         }
+
+        foreach ((int, int) visibleChunk in _visibleChunks)
+        {
+            if (!newChunks.Contains(visibleChunk))
+            {
+                _chunks[visibleChunk].DestroyRenderTarget();
+            }
+        }
+
+        _visibleChunks = newChunks;
     }
 
     public void Render(Renderer renderer, Vector2 offset)
     {
-        foreach ((Vector2 chunkPosition, Chunk chunk) in _visibleChunks)
+        foreach ((int x, int y) chunkPosition in _visibleChunks)
         {
+            Chunk chunk = _chunks[chunkPosition];
+            
             if (chunk.Dirty)
             {
                 chunk.RebuildChunk(renderer);
@@ -103,8 +137,8 @@ public class TileEngine
 
             SDL.FRect dstRect = new()
             {
-                X = (chunkPosition.X - offset.X) * _zoom,
-                Y = (chunkPosition.Y - offset.Y) * _zoom,
+                X = (chunkPosition.x - offset.X) * _zoom,
+                Y = (chunkPosition.y - offset.Y) * _zoom,
                 W = Chunk.CHUNK_PIXEL_WIDTH * _zoom,
                 H = Chunk.CHUNK_PIXEL_HEIGHT * _zoom
             };
@@ -120,10 +154,10 @@ public class TileEngine
 
     public bool PlaceTile(Texture2D texture, Vector2 worldPosition)
     {
-        (Vector2 chunkPos, Chunk chunk) = GetOrCreateChunk(worldPosition);
+        ((int x, int y), Chunk chunk) = GetOrCreateChunk((int)worldPosition.X, (int)worldPosition.Y);
 
-        float chunkX = worldPosition.X - chunkPos.X;
-        float chunkY = worldPosition.Y - chunkPos.Y;
+        float chunkX = worldPosition.X - x;
+        float chunkY = worldPosition.Y - y;
 
         if (!chunk.PlaceTileAt(new Vector2(chunkX, chunkY), texture, 1f)) return false;
         return true;
@@ -131,10 +165,10 @@ public class TileEngine
 
     public bool RemoveTile(Vector2 worldPosition)
     {
-        (Vector2 chunkPos, Chunk chunk) = GetOrCreateChunk(worldPosition);
+        ((int x, int y), Chunk chunk) = GetOrCreateChunk((int)worldPosition.X, (int)worldPosition.Y);
 
-        float chunkX = worldPosition.X - chunkPos.X;
-        float chunkY = worldPosition.Y - chunkPos.Y;
+        float chunkX = worldPosition.X - x;
+        float chunkY = worldPosition.Y - y;
 
         if (!chunk.RemoveTileAt(new Vector2(chunkX, chunkY)))
             return false;
@@ -142,33 +176,31 @@ public class TileEngine
         return true;
     }
 
-    public void PlaceChunk(Vector2 worldPosition)
+    public int GetChunkAmount()
     {
-        Vector2 chunkPosition = AlignToChunkGrid(worldPosition);
-
-        if (_chunks.ContainsKey(chunkPosition))
-            return;
-
-        Chunk chunk = GenerateChunk(chunkPosition);
-        _visibleChunks.Add((chunkPosition, chunk));
-        _chunks.Add(chunkPosition, chunk);
+        return _chunks.Values.Count;
     }
 
-    public static Vector2 AlignToGrid(Vector2 worldPosition)
+    public int GetVisibleChunkAmount()
     {
-        return new Vector2((int)MathF.Floor(worldPosition.X / GamingState.TILE_WIDTH) * GamingState.TILE_WIDTH,
-                           (int)MathF.Floor(worldPosition.Y / GamingState.TILE_HEIGHT) * GamingState.TILE_WIDTH);
+        return _visibleChunks.Count;
     }
 
-    private static Vector2 AlignToChunkGrid(Vector2 worldPosition)
+    public static (int x, int y) AlignToGrid(int worldX, int worldY)
     {
-        return new Vector2((int)Math.Floor(worldPosition.X / Chunk.CHUNK_PIXEL_WIDTH) * Chunk.CHUNK_PIXEL_WIDTH,
-                           (int)Math.Floor(worldPosition.Y / Chunk.CHUNK_PIXEL_HEIGHT) * Chunk.CHUNK_PIXEL_HEIGHT);
+        return ((int)MathF.Floor(worldX / GamingState.TILE_WIDTH) * GamingState.TILE_WIDTH,
+                (int)MathF.Floor(worldY / GamingState.TILE_HEIGHT) * GamingState.TILE_HEIGHT);
     }
 
-    private (Vector2, Chunk) GetOrCreateChunk(Vector2 worldPosition)
+    private static (int x, int y) AlignToChunkGrid(int worldX, int worldY)
     {
-        Vector2 chunkPosition = AlignToChunkGrid(worldPosition);
+        return ((int)MathF.Floor(worldX / Chunk.CHUNK_PIXEL_WIDTH) * Chunk.CHUNK_PIXEL_WIDTH,
+                (int)MathF.Floor(worldY / Chunk.CHUNK_PIXEL_HEIGHT) * Chunk.CHUNK_PIXEL_HEIGHT);
+    }
+
+    private ((int x, int y), Chunk) GetOrCreateChunk(int x, int y)
+    {
+        (int x, int y) chunkPosition = AlignToChunkGrid(x, y);
 
         if (_chunks.TryGetValue(chunkPosition, out Chunk? foundChunk))
         {
@@ -176,21 +208,21 @@ public class TileEngine
         }
 
         Chunk chunk = new();
-        _chunks.Add(chunkPosition, chunk);
-        _visibleChunks.Add((chunkPosition, chunk));
+        _chunks.TryAdd(chunkPosition, chunk);
+        _visibleChunks.Add(chunkPosition);
         return (chunkPosition, _chunks[chunkPosition]);
     }
 
-    private Chunk GenerateChunk(Vector2 worldPosition)
+    private Chunk GenerateChunk(int chunkX, int chunkY)
     {
-        Vector2 chunkPosition = AlignToChunkGrid(worldPosition);
+        (int x, int y) chunkPosition = AlignToChunkGrid(chunkX, chunkY);
 
         Chunk chunk = new();
         for (int y = 0; y < Chunk.CHUNK_HEIGHT; y++)
         {
             for (int x = 0; x < Chunk.CHUNK_WIDHT; x++)
             {
-                float noiseValue = _noise.GetNoise(chunkPosition.X + x * GamingState.TILE_WIDTH, chunkPosition.Y + y * GamingState.TILE_HEIGHT);
+                float noiseValue = _noise.GetNoise(chunkPosition.x + x * GamingState.TILE_WIDTH, chunkPosition.y + y * GamingState.TILE_HEIGHT);
 
                 float brightness = 1f;
 
@@ -204,5 +236,34 @@ public class TileEngine
         }
 
         return chunk;
+    }
+
+    private async Task GenerateChunkAsync(int worldX, int worldY)
+    {
+        Chunk chunk = new();
+
+        for (int y = 0; y < Chunk.CHUNK_HEIGHT; y++)
+        {
+            for (int x = 0; x < Chunk.CHUNK_WIDHT; x++)
+            {
+                float noiseValue = _noise.GetNoise(worldX + x * GamingState.TILE_WIDTH, worldY + y * GamingState.TILE_HEIGHT);
+
+                float brightness = 1f;
+
+                if (noiseValue < 1f) brightness = 1;
+                if (noiseValue < 0.65f) brightness = 0.65f;
+                if (noiseValue < 0.4f) brightness = 0.4f;
+
+                Vector2 tileChunkPosition = new Vector2(x * GamingState.TILE_WIDTH, y * GamingState.TILE_HEIGHT);
+                chunk.PlaceTileAt(tileChunkPosition, AssetManager.GetTexture("Grass"), brightness);
+            }
+        } 
+
+        _chunks.TryAdd((worldX, worldY), chunk);
+
+        lock (_generatingChunksLock)
+        {
+            _generatingChunks.Remove((worldX, worldY));
+        }
     }
 }
