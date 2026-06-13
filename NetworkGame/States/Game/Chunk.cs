@@ -22,11 +22,6 @@ public class Chunk
 
     public void RebuildChunk(Renderer renderer)
     {
-        RecalculateVertices();
-
-        Stopwatch renderTarget = new();
-        renderTarget.Start();
-        
         SDL.DestroyTexture(RenderTarget);
         RenderTarget = SDL.CreateTexture(renderer.Handle, SDL.PixelFormat.RGBA8888, SDL.TextureAccess.Target, CHUNK_WIDHT * GamingState.TILE_WIDTH, CHUNK_HEIGHT * GamingState.TILE_HEIGHT);
         SDL.SetTextureScaleMode(RenderTarget, SDL.ScaleMode.Nearest);
@@ -36,7 +31,6 @@ public class Chunk
         SDL.SetRenderTarget(renderer.Handle, IntPtr.Zero);
 
         Dirty = false;
-        _vertices = [];
     }
 
     public void DestroyRenderTarget()
@@ -71,8 +65,11 @@ public class Chunk
         return true;
     }
 
-    public void RecalculateVertices()
+    public async Task RecalculateVertices()
     {
+        Array.Clear(_vertices);
+        Array.Clear(_indices);
+
         List<SDL.Vertex> vertices = new();
         List<int> indices = new();
 

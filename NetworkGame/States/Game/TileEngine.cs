@@ -5,6 +5,7 @@ using SDL3;
 using Smash;
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Diagnostics;
 
 public class TileEngine
 {
@@ -84,8 +85,11 @@ public class TileEngine
     public void UpdateVisibleChunks(Vector2 offset, float zoom)
     {
         (int sx, int sy) startPos = AlignToChunkGrid((int)offset.X - Chunk.CHUNK_PIXEL_WIDTH * 2, (int)offset.Y - Chunk.CHUNK_PIXEL_HEIGHT * 2);
-        if (_lastVisibleChunkOrigin == startPos) return;
-        else _lastVisibleChunkOrigin = startPos;
+
+        if (_lastVisibleChunkOrigin == startPos) 
+            return;
+        else   
+            _lastVisibleChunkOrigin = startPos;
 
         HashSet<(int nx, int ny)> newChunks = new();
 
@@ -259,6 +263,7 @@ public class TileEngine
             }
         } 
 
+        await chunk.RecalculateVertices();
         _chunks.TryAdd((worldX, worldY), chunk);
 
         lock (_generatingChunksLock)

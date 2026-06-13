@@ -78,7 +78,6 @@ public class GamingState : GameState
 
         if (_preferredZoom != _zoom)
         {
-            //_zoom = MathHelper.Lerp(_zoom, _preferredZoom, 30 * (float)deltaTime);
             _zoom = _preferredZoom;
 
             _backgroundTileEngine.SetZoom(_zoom);
@@ -159,7 +158,7 @@ public class GamingState : GameState
             float previousZoom = _preferredZoom;
 
             _preferredZoom += InputHandler.ScrollWheelDelta / (20 / _zoom);
-            _preferredZoom = Math.Clamp(_preferredZoom, 0.08f, 2f);
+            _preferredZoom = Math.Clamp(_preferredZoom, 0.05f, 2f);
 
             float greaterZoom = Math.Min(previousZoom, _preferredZoom);
             _tileEngine.UpdateVisibleChunks(_cameraPosition, greaterZoom);
