@@ -16,10 +16,12 @@ public class TileEngine
     private float _zoom = 1;
 
     private ConcurrentDictionary<(int x, int y), Chunk> _chunks = new();
-    private List<(int x, int y)> _visibleChunks = new();
+    private HashSet<(int x, int y)> _visibleChunks = new();
 
     private readonly object _generatingChunksLock = new();
     private readonly HashSet<(int x, int y)> _generatingChunks = new();
+
+    private (int x, int y)? _lastVisibleChunkOrigin = null;
 
     private FastNoiseLite _noise;
 
@@ -81,8 +83,11 @@ public class TileEngine
 
     public void UpdateVisibleChunks(Vector2 offset, float zoom)
     {
-        List<(int nx, int ny)> newChunks = new();
         (int sx, int sy) startPos = AlignToChunkGrid((int)offset.X - Chunk.CHUNK_PIXEL_WIDTH * 2, (int)offset.Y - Chunk.CHUNK_PIXEL_HEIGHT * 2);
+        if (_lastVisibleChunkOrigin == startPos) return;
+        else _lastVisibleChunkOrigin = startPos;
+
+        HashSet<(int nx, int ny)> newChunks = new();
 
         float pixelsX = startPos.sx + (App.WindowWidth / zoom) + (Chunk.CHUNK_PIXEL_WIDTH * 3);
         float pixelsY = startPos.sy + (App.WindowHeight / zoom) + (Chunk.CHUNK_PIXEL_HEIGHT * 3);
@@ -99,10 +104,8 @@ public class TileEngine
                 {
                     lock (_generatingChunksLock)
                     {
-                        if (!_generatingChunks.Contains((x, y)))
+                        if (_generatingChunks.Add((x, y)))
                         {
-                            _generatingChunks.Add((x, y));
-
                             int chunkX = x;
                             int chunkY = y;
 
@@ -113,12 +116,9 @@ public class TileEngine
             }
         }
 
-        foreach ((int, int) visibleChunk in _visibleChunks)
+        foreach (var chunk in _visibleChunks.Except(newChunks))
         {
-            if (!newChunks.Contains(visibleChunk))
-            {
-                _chunks[visibleChunk].DestroyRenderTarget();
-            }
+            _chunks[chunk].DestroyRenderTarget();
         }
 
         _visibleChunks = newChunks;

@@ -23,6 +23,9 @@ public class Chunk
     public void RebuildChunk(Renderer renderer)
     {
         RecalculateVertices();
+
+        Stopwatch renderTarget = new();
+        renderTarget.Start();
         
         SDL.DestroyTexture(RenderTarget);
         RenderTarget = SDL.CreateTexture(renderer.Handle, SDL.PixelFormat.RGBA8888, SDL.TextureAccess.Target, CHUNK_WIDHT * GamingState.TILE_WIDTH, CHUNK_HEIGHT * GamingState.TILE_HEIGHT);

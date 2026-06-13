@@ -62,8 +62,8 @@ public class GamingState : GameState
         _backgroundTileEngine = new(WORLD_WIDTH, WORLD_HEIGHT, 1, worldSeed, true);
         _tileEngine = new(WORLD_WIDTH, WORLD_HEIGHT, 1, worldSeed, false);
 
-        _backgroundTileEngine.UpdateVisibleChunks(new Vector2(), 1);
         _tileEngine.UpdateVisibleChunks(new Vector2(), 1);
+        _backgroundTileEngine.UpdateVisibleChunks(new Vector2(), 1);
     }
 
     public override void Update(double deltaTime)
@@ -135,8 +135,9 @@ public class GamingState : GameState
             }
         }
 
-        _playerData.X += movementVector.X * CAMERA_SPEED * (float)deltaTime;
-        _playerData.Y += movementVector.Y * CAMERA_SPEED * (float)deltaTime;
+        float sprintModifier = InputHandler.IsKeyDown(SDL.Keycode.LShift) ? 1200 : 0;
+        _playerData.X += movementVector.X * (CAMERA_SPEED + sprintModifier) * (float)deltaTime;
+        _playerData.Y += movementVector.Y * (CAMERA_SPEED + sprintModifier) * (float)deltaTime;
 
         Texture2D playerTexture = AssetManager.GetTexture("mogus");
         _cameraX = _playerData.X - (App.WindowWidth / 2 / _zoom) + (playerTexture.Width / 2);
