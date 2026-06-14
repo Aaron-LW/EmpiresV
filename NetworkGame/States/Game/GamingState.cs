@@ -6,7 +6,6 @@ using Smash;
 using Smash.Graphics;
 using Smash.Input;
 using System.Diagnostics;
-using System.Runtime.Intrinsics;
 
 public class GamingState : GameState
 {
@@ -158,7 +157,7 @@ public class GamingState : GameState
             float previousZoom = _preferredZoom;
 
             _preferredZoom += InputHandler.ScrollWheelDelta / (20 / _zoom);
-            _preferredZoom = Math.Clamp(_preferredZoom, 0.05f, 2f);
+            _preferredZoom = Math.Clamp(_preferredZoom, 0.1f, 2f);
 
             float greaterZoom = Math.Min(previousZoom, _preferredZoom);
             _tileEngine.UpdateVisibleChunks(_cameraPosition, greaterZoom);
