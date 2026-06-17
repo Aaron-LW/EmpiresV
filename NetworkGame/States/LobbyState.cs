@@ -35,7 +35,7 @@ public class LobbyState : GameState
         _localIp = GetLocalIp();
         _hostCrown = AssetManager.GetTexture("HostCrown");
 
-        _userPlayerData = new PlayerData { Host = previousStateResult.PlayerData.Host, Username = previousStateResult.PlayerData.Username };
+        _userPlayerData = new PlayerData { Host = previousStateResult.PlayerData.Host, Username = previousStateResult.PlayerData.Username, Id = byte.MaxValue };
 
         _chatInputField = new()
         {
@@ -61,6 +61,8 @@ public class LobbyState : GameState
                 BackgroundColor = Color.FromArgb(35, 35, 35)
             };
         }
+
+        _ = App.SendPacketTcp([PacketId.PACKET_REQUEST_DATA]);
     }
 
     public override void Update(double deltaTime)
@@ -107,8 +109,8 @@ public class LobbyState : GameState
         {
             if (_chatInputField.Selected && !string.IsNullOrEmpty(_chatInputField.Text))
             {
-                PingPacket pingPacket = new PingPacket() { Message = _chatInputField.Text, Username = _userPlayerData.Username };
-                _ = App.SendPacketTcp(PacketId.PACKET_PING, pingPacket);
+                PingPacket pingPacket = new PingPacket(null) { Message = _chatInputField.Text };
+                _ = App.SendPacketTcp(pingPacket.Serialize());
 
                 _chat.Add((_userPlayerData.Username, _chatInputField.Text));
                 _preferredChatScroll = Math.Min(-_chat.Count * 40 + _chatRectangle.Height - 25, 0);
@@ -173,7 +175,7 @@ public class LobbyState : GameState
             if (position.Y < 0) continue;
             
             if (_chat[i].username != string.Empty)
-                renderer.RenderText(App.Font, $"{_chat[i].username}: {_chat[i].message}", Vector2.Round(position), Color.White);
+                renderer.RenderText(App.Font, $"{_chat[i].username.Trim()}: {_chat[i].message}", Vector2.Round(position), Color.White);
             else
                 renderer.RenderText(App.Font, $"{_chat[i].message}", Vector2.Round(position), Color.MediumSpringGreen);
 
@@ -196,37 +198,47 @@ public class LobbyState : GameState
         return null;
     }
 
-    public override void ForwardPacket(byte id, string json)
+    public override void ForwardPacket(byte[] data)
     {
-        switch (id)
+        data = data[4..data.Length];
+
+        byte packetId = data[0];
+        byte playerId = data[^1];
+
+        string? playerName = null;
+
+        foreach (PlayerData playerData in _playerData.Values)
+            if (playerData.Id == playerId) playerName = playerData.Username;
+        
+
+        switch (packetId)
         {
             case PacketId.PACKET_JOIN:
-                JoinPacket joinPacket = JsonSerializer.Deserialize<JoinPacket>(json)!;
-                lock (_playerDataLock) _playerData.Add(joinPacket.Username, new PlayerData() { Username = joinPacket.Username });
+                JoinPacket joinPacket = new(data);
+                lock (_playerDataLock) _playerData!.Add(joinPacket.Username!, new PlayerData() { Username = joinPacket.Username!, Id = playerId });
                 Console.WriteLine("Received join packet from " + joinPacket.Username);
                 _chat.Add(("", $"{joinPacket.Username} has joined the game"));
                 break;
 
             case PacketId.PACKET_PLAYERDATA:
-                PlayerDataPacket playerDataPacket = JsonSerializer.Deserialize<PlayerDataPacket>(json)!;
-                lock (_playerDataLock) _playerData[playerDataPacket.Username] = playerDataPacket.PlayerData;
-                Console.WriteLine("Received player data packet from " + playerDataPacket.Username);
+                PlayerDataPacket playerDataPacket = new(data);
+                lock (_playerDataLock) _playerData![playerDataPacket.PlayerData!.Username] = playerDataPacket.PlayerData!;
+                Console.WriteLine("Received player data packet from " + playerDataPacket.PlayerData.Username);
                 break;
 
             case PacketId.PACKET_PING:
-                PingPacket pingPacket = JsonSerializer.Deserialize<PingPacket>(json)!;
-                _chat.Add((pingPacket.Username, pingPacket.Message));
+                PingPacket pingPacket = new(data);
+                _chat.Add((playerName!, pingPacket.Message));
                 _preferredChatScroll = Math.Min(-_chat.Count * 40 + _chatRectangle.Height - 25, 0);
                 break;
 
             case PacketId.PACKET_LEAVE:
-                LeavePacket leavePacket = JsonSerializer.Deserialize<LeavePacket>(json)!;
-                _chat.Add(("", $"{leavePacket.Username} has left the game"));
-                _playerData.Remove(leavePacket.Username);
+                _chat.Add(("", $"{playerName} has left the game"));
+                _playerData!.Remove(playerName!);
                 break;
 
             case PacketId.PACKET_START_GAME:
-                StartGamePacket startGamePacket = JsonSerializer.Deserialize<StartGamePacket>(json)!;
+                StartGamePacket startGamePacket = new(data);
                 OnStateFinish(new LobbyStateResult
                 {
                     PlayerData = _userPlayerData,
@@ -239,7 +251,7 @@ public class LobbyState : GameState
                 break;
         }
         
-        base.ForwardPacket(id, json);
+        base.ForwardPacket(data);
     }
 
     protected override void OnStateFinish<LobbyStateResult>(LobbyStateResult lobbyStateResult)

@@ -66,7 +66,7 @@ public class App : Application
 
         if (autoconnect)
         {
-            SetState(new GamingState(new StateResult { PlayerData = new PlayerData() { Username = username ?? "Default name", Host = true, X = 0, Y = 0 }, Type = "lobby" }, Random.Shared.Next(100, 5000)));
+            SetState(new GamingState(new StateResult { PlayerData = new PlayerData() { Username = username ?? "Default name", Host = true, X = 0, Y = 0, Id = byte.MaxValue }, Type = "lobby" }, Random.Shared.Next(100, 5000)));
         }
         else
         {
@@ -83,7 +83,7 @@ public class App : Application
         {
             HostServer(new MenuStateResult()
             {
-                PlayerData = new PlayerData() { Username = username ?? "Default name", Host = true},
+                PlayerData = new PlayerData() { Username = username ?? "Default name", Host = true, Id = byte.MaxValue},
                 Type = "menu",
                 Ip = "127.0.0.1"
             });
@@ -166,7 +166,7 @@ public class App : Application
                     Random random = new();
                     int seed = random.Next(100, 5000);
 
-                    SendPacketTcp(PacketId.PACKET_START_GAME, new StartGamePacket() { Username = stateFinishEventArgs.StateResult.PlayerData.Username, Seed = seed }).GetAwaiter().GetResult();
+                    SendPacketTcp(new StartGamePacket(null) { Seed = seed }.Serialize()).GetAwaiter().GetResult();
                     SetState(new GamingState(lobbyStateResult, seed));
                 }
             }
@@ -262,20 +262,27 @@ public class App : Application
 
     // --- Fucking networking stuff ---
 
-    public static async Task SendPacketTcp<T>(byte id, T packet) where T : Packet
+    public static async Task SendPacketTcp(byte[] data)
     {
         if (_networkStream == null) return;
 
-        ReadOnlyMemory<byte> buffer = new([id, .. Encoding.UTF8.GetBytes(JsonSerializer.Serialize(packet) + "\n")]);
-        _ = Task.Run(async () => _networkStream.WriteAsync(buffer));
+        await Task.Run(async () => _networkStream.WriteAsync(FramePacket(data)));
     }
 
-    public static async Task SendPacketUdp<T>(byte id, T packet) where T : Packet
-    {
-        if (_udpClient == null) return;
+    //public static async Task SendPacketUdp<T>(byte id, T packet) where T : Packet
+    //{
+    //    if (_udpClient == null) return;
 
-        byte[] data = [id, .. Encoding.UTF8.GetBytes(JsonSerializer.Serialize(packet))];
-        await _udpClient.SendAsync(data, data.Length, _serverEndPoint);
+    //    byte[] data = [id, .. Encoding.UTF8.GetBytes(JsonSerializer.Serialize(packet))];
+    //    await _udpClient.SendAsync(data, data.Length, _serverEndPoint);
+    //}
+
+    private static byte[] FramePacket(byte[] packet)
+    {
+        byte[] data = new byte[packet.Length + 4];
+        BitConverter.GetBytes(packet.Length).CopyTo(data, 0);
+        packet.CopyTo(data, 4);
+        return data;
     }
 
     //(Could connect, is host)
@@ -310,7 +317,7 @@ public class App : Application
         NetworkStream networkStream = tcpClient.GetStream();
 
 
-        byte[] login = [PacketId.PACKET_LOGIN, .. Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new LoginPacket { Username = username }))];
+        byte[] login = new LoginPacket(null) { Username = username }.Serialize();
         networkStream.Write(login);
 
         byte[] connectionBuffer = new byte[2];
@@ -346,7 +353,7 @@ public class App : Application
 
             _serverEndPoint = new IPEndPoint(addresses[(int)connectedIndex!], 5000);
 
-            SendPacketUdp(PacketId.PACKET_UDP_INIT, new Packet { Username = username }).GetAwaiter();
+            //SendPacketUdp(PacketId.PACKET_UDP_INIT, new Packet { Username = username }).GetAwaiter();
 
             _ = Task.Run(async () => ReceivePackets(false));
             _ = Task.Run(async () => ReceivePackets(true));
@@ -373,13 +380,15 @@ public class App : Application
     private async Task ReceivePackets(bool udp)
     {
         byte[] buffer = new byte[1024];
-        StringBuilder stringBuilder = new();
 
         while (true)
         {
+            int bytesRead;
+
             if (!udp)
             {
-                int bytesRead = await _networkStream!.ReadAsync(buffer, 0, buffer.Length);
+                bytesRead = await _networkStream!.ReadAsync(buffer, 0, buffer.Length);
+
                 if (bytesRead == 0)
                 {
                     Console.WriteLine("Disconnected from server");
@@ -389,32 +398,16 @@ public class App : Application
                     SetState(new MenuState(new StateResult() { PlayerData = null!, Type = "none" }));
                     break;
                 }
-
-                stringBuilder.Append(Encoding.UTF8.GetString(buffer, 0, bytesRead));
             }
             else
             {
                 UdpReceiveResult result = await _udpClient!.ReceiveAsync();
-                stringBuilder.Append(Encoding.UTF8.GetString(result.Buffer));
+                buffer = result.Buffer;
+                bytesRead = buffer.Length;
             }
 
-            while (stringBuilder.ToString().Contains("\n"))
-            {
-                string full = stringBuilder.ToString();
-                int index = full.IndexOf("\n");
-
-                string line = full.Substring(0, index);
-                stringBuilder.Remove(0, index + 1);
-
-                try
-                {
-                    _currentState?.ForwardPacket(Convert.ToByte(line[0]), line.Substring(1, line.Length - 1));
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("Json error: " + ex.Message);
-                }
-            }
+            _currentState?.ForwardPacket(buffer[0..bytesRead]);
+            buffer = new byte[1024];
         }
     }
 }

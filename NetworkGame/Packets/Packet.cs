@@ -1,4 +1,4 @@
-public class Packet
+public abstract class Packet
 {
-    public required string Username { get; set; }
+    public abstract byte[] Serialize();
 }

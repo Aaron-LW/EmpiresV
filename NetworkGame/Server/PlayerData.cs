@@ -3,6 +3,7 @@ using System.Numerics;
 public class PlayerData
 {
     public required string Username { get; set; }
+    public required byte Id { get; set; }
 
     public float X { get; set; }
     public float Y { get; set; }

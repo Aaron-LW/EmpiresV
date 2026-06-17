@@ -45,6 +45,8 @@ public class GamingState : GameState
     private float _elapsedTime;
     private long _ramUsage;
 
+    private Vector2 _lastSentMovePacketLocation = new();
+
     private List<(string username, string message)> _chatHistory = new();
 
     public GamingState(StateResult previousStateResult, int worldSeed) : base(previousStateResult)
@@ -110,7 +112,7 @@ public class GamingState : GameState
             {
                 if (_chatMessage != string.Empty)
                 {
-                    _ = App.SendPacketTcp(PacketId.PACKET_PING, new PingPacket() { Username = _playerData.Username, Message = _chatMessage });
+                    _ = App.SendPacketTcp(new PingPacket(null) { Message = _chatMessage }.Serialize());
                     SendChatMessage(_playerData.Username, _chatMessage);
 
                     _chatMessage = "";
@@ -141,12 +143,15 @@ public class GamingState : GameState
         _cameraX = _playerData.X - (App.WindowWidth / 2 / _zoom) + (playerTexture.Width / 2);
         _cameraY = _playerData.Y - (App.WindowHeight / 2 / _zoom) + (playerTexture.Height / 2);
 
-        if (movementVector != Vector2.Zero)
+        if (movementVector != Vector2.Zero && _cameraPosition != _lastSentMovePacketLocation)
         {
-            if (Program.TCPOnly)
-                _ = App.SendPacketTcp(PacketId.PACKET_UPDATE_POS, new PositionUpdatePacket() { Username = _playerData.Username, X = _playerData.X, Y = _playerData.Y });
-            else
-                _ = App.SendPacketUdp(PacketId.PACKET_UPDATE_POS, new PositionUpdatePacket() { Username = _playerData.Username, X = _playerData.X, Y = _playerData.Y });
+            //if (Program.TCPOnly)
+            //    _ = App.SendPacketTcp(PacketId.PACKET_UPDATE_POS, new PositionUpdatePacket() { Username = _playerData.Username, X = _playerData.X, Y = _playerData.Y });
+            //else
+            //    _ = App.SendPacketUdp(PacketId.PACKET_UPDATE_POS, new PositionUpdatePacket() { Username = _playerData.Username, X = _playerData.X, Y = _playerData.Y });
+
+            _ = App.SendPacketTcp(new PositionUpdatePacket(null) {  X = _playerData.X, Y = _playerData.Y }.Serialize() );
+            _lastSentMovePacketLocation = _cameraPosition;
 
             _backgroundTileEngine.UpdateVisibleChunks(_cameraPosition, _preferredZoom);
             _tileEngine.UpdateVisibleChunks(_cameraPosition, _preferredZoom);
@@ -177,7 +182,7 @@ public class GamingState : GameState
             Vector2 position = InputHandler.MousePosition / _zoom + _cameraPosition;
             if (_tileEngine.PlaceTile(AssetManager.GetTexture("CoalTile"), position))
             {
-                _ = App.SendPacketTcp(PacketId.PACKET_PLACE_TILE, new PlaceTilePacket() { Username = _playerData.Username, TextureName = "CoalTile", X = position.X, Y = position.Y});
+                //_ = App.SendPacketTcp(PacketId.PACKET_PLACE_TILE, new PlaceTilePacket() { Username = _playerData.Username, TextureName = "CoalTile", X = position.X, Y = position.Y});
             }
         }
 
@@ -186,7 +191,7 @@ public class GamingState : GameState
             Vector2 mousePos = _mouseWorldPos;
             if (_tileEngine.RemoveTile(mousePos))
             {
-                _ = App.SendPacketTcp(PacketId.PACKET_REMOVE_TILE, new RemoveTilePacket() { Username = _playerData.Username, X = mousePos.X, Y = mousePos.Y });
+                //_ = App.SendPacketTcp(PacketId.PACKET_REMOVE_TILE, new RemoveTilePacket() { Username = _playerData.Username, X = mousePos.X, Y = mousePos.Y });
             }
         }
     }
@@ -241,41 +246,40 @@ public class GamingState : GameState
         renderer.RenderText(App.Font, $"Visible Chunks: {_backgroundTileEngine.GetVisibleChunkAmount()}", new Vector2(20, 100), Color.White);
     }
 
-    public override void ForwardPacket(byte id, string json)
+    public override void ForwardPacket(byte[] data)
     {
-        switch (id)
+        data = data[4..data.Length];
+
+        byte packetId = data[0];
+        byte playerId = data[^1];
+
+        string? playerName = null;
+
+        foreach (PlayerData playerData in _peersData!.Values)
+            if (playerData.Id == playerId) playerName = playerData.Username;
+
+        switch (packetId)
         {
             case PacketId.PACKET_UPDATE_POS:
-                PositionUpdatePacket positionUpdatePacket = JsonSerializer.Deserialize<PositionUpdatePacket>(json)!;
-                _peersData![positionUpdatePacket.Username].X = positionUpdatePacket.X;
-                _peersData![positionUpdatePacket.Username].Y = positionUpdatePacket.Y;
+                PositionUpdatePacket positionUpdatePacket = new(data);
+                _peersData![playerName!].X = positionUpdatePacket.X;
+                _peersData![playerName!].Y = positionUpdatePacket.Y;
                 break;
 
             case PacketId.PACKET_LEAVE:
-                LeavePacket leavePacket = JsonSerializer.Deserialize<LeavePacket>(json)!;
-                Console.WriteLine("Received leave packet from " + leavePacket.Username);
-                SendChatMessage("", $"{leavePacket.Username} has left the game");
-                _peersData!.Remove(leavePacket.Username);
+                Console.WriteLine("Received leave packet from " + playerName);
+                SendChatMessage("", $"{playerName} has left the game");
+                _peersData!.Remove(playerName!);
                 break;
 
             case PacketId.PACKET_PING:
-                PingPacket pingPacket = JsonSerializer.Deserialize<PingPacket>(json)!;
-                SendChatMessage(pingPacket.Username, pingPacket.Message);
+                PingPacket pingPacket = new(data);
+                SendChatMessage(playerName!, pingPacket.Message);
                 _chatCooldown = CHAT_BASE_COOLDOWN;
-                break;
-
-            case PacketId.PACKET_PLACE_TILE:
-                PlaceTilePacket placeTilePacket = JsonSerializer.Deserialize<PlaceTilePacket>(json)!;
-                _tileEngine.PlaceTile(AssetManager.GetTexture(placeTilePacket.TextureName), new Vector2(placeTilePacket.X, placeTilePacket.Y));
-                break;
-
-            case PacketId.PACKET_REMOVE_TILE:
-                RemoveTilePacket removeTilePacket = JsonSerializer.Deserialize<RemoveTilePacket>(json)!;
-                _tileEngine.RemoveTile(new Vector2(removeTilePacket.X, removeTilePacket.Y));
                 break;
         }
 
-        base.ForwardPacket(id, json);
+        base.ForwardPacket(data);
     }
 
     private void SendChatMessage(string username, string message)
