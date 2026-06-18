@@ -127,7 +127,7 @@ public class LobbyState : GameState
 
         renderer.RenderText(App.Font, "Lobby", new Vector2(20), Color.White);
 
-        List<PlayerData> playerData;
+        List<PlayerData> playerData = new();
         lock (_playerDataLock)
         {
             playerData = [_userPlayerData, .. _playerData.Values];
@@ -185,9 +185,10 @@ public class LobbyState : GameState
         {
             case PacketId.PACKET_JOIN:
                 JoinPacket joinPacket = new(data);
-                lock (_playerDataLock) _playerData!.Add(playerId, new PlayerData() { Username = joinPacket.Username! });
+                lock (_playerDataLock) { _playerData!.Add(playerId, new PlayerData() { Username = joinPacket.Username! }); }
                 Console.WriteLine("Received join packet from " + joinPacket.Username);
                 _chat.Add(("", $"{joinPacket.Username} has joined the game"));
+                _preferredChatScroll = Math.Min(-_chat.Count * 40 + _chatRectangle.Height - 25, 0);
                 break;
 
             case PacketId.PACKET_PLAYERDATA:
@@ -205,7 +206,8 @@ public class LobbyState : GameState
             case PacketId.PACKET_LEAVE:
                 Console.WriteLine("Received leave packet from " + _playerData[playerId].Username);
                 _chat.Add(("", $"{_playerData[playerId].Username} has left the game"));
-                lock (_playerDataLock) _playerData!.Remove(playerId);
+                _preferredChatScroll = Math.Min(-_chat.Count * 40 + _chatRectangle.Height - 25, 0);
+                lock (_playerDataLock) { _playerData!.Remove(playerId); }
                 break;
 
             case PacketId.PACKET_START_GAME:

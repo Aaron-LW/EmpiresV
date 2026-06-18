@@ -259,7 +259,8 @@ public class Server
     {
         foreach (PlayerClient playerClient in _clients)
         {
-            if (sender?.Id == playerClient.Id) continue;
+            if (sender != null)
+                if (sender.Id == playerClient.Id) continue;
 
             NetworkStream networkStream = playerClient.TcpClient.GetStream();
 
@@ -267,7 +268,7 @@ public class Server
 
             try
             {
-                await networkStream.WriteAsync(FramePacket(data, sender?.Id ?? byte.MaxValue), 0, data.Length + 5);
+                await networkStream.WriteAsync(FramePacket(data, sender?.Id), 0, data.Length + 5);
             }
             catch (Exception ex)
             {
@@ -284,18 +285,19 @@ public class Server
     {
         foreach (PlayerClient playerClient in _clients)
         {
-            if (sender?.Id == playerClient.Id) continue;
+            if (sender != null)
+                if (sender.Id == playerClient.Id) continue;
 
-            await _udpServer!.SendAsync(FramePacket(data, sender?.Id ?? byte.MaxValue), data.Length + 5, playerClient.UdpEndPoint);
+            await _udpServer!.SendAsync(FramePacket(data, sender?.Id), data.Length + 5, playerClient.UdpEndPoint);
         }
     }
 
-    private byte[] FramePacket(byte[] packet, byte senderId)
+    private byte[] FramePacket(byte[] packet, byte? senderId)
     {
         byte[] data = new byte[packet.Length + 5];
         BitConverter.GetBytes(packet.Length).CopyTo(data, 0);
         packet.CopyTo(data, 4);
-        data[^1] = senderId;
+        data[^1] = senderId ?? byte.MaxValue;
         return data;
     }
 
