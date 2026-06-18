@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Numerics;
 using SDL3;
 using Smash.Graphics;
@@ -20,7 +19,9 @@ public class Chunk
     private SDL.Vertex[] _vertices = [];
     private int[] _indices = [];
 
-    public void RebuildChunk(Renderer renderer)
+    private CancellationTokenSource _recalcVerticesCancellationTokenSource = new();
+
+    public void RedrawChunk(Renderer renderer)
     {
         SDL.DestroyTexture(RenderTarget);
         RenderTarget = SDL.CreateTexture(renderer.Handle, SDL.PixelFormat.RGBA8888, SDL.TextureAccess.Target, CHUNK_WIDHT * GamingState.TILE_WIDTH, CHUNK_HEIGHT * GamingState.TILE_HEIGHT);
@@ -67,6 +68,15 @@ public class Chunk
 
     public async Task RecalculateVertices()
     {
+        _recalcVerticesCancellationTokenSource.Cancel();
+        _recalcVerticesCancellationTokenSource.Dispose();
+
+        _recalcVerticesCancellationTokenSource = new();
+        await RecalculateVerticesAsync(_recalcVerticesCancellationTokenSource.Token);
+    }
+
+    private async Task RecalculateVerticesAsync(CancellationToken cancellationToken)
+    {
         Array.Clear(_vertices);
         Array.Clear(_indices);
 
@@ -84,6 +94,11 @@ public class Chunk
         {
             for (int x = 0; x < CHUNK_WIDHT; x++)
             {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
                 Tile? tile = _tiles[y * CHUNK_WIDHT + x];
                 if (tile == null) continue;
 

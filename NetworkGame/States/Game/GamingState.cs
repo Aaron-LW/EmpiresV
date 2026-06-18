@@ -33,7 +33,7 @@ public class GamingState : GameState
     private float _cameraY;
     private Vector2 _cameraPosition => new Vector2(_cameraX, _cameraY);
 
-    private Vector2 _mouseWorldPos => InputHandler.MousePosition / _zoom + _cameraPosition;
+    private Vector2 _mouseWorldPos => (InputHandler.MousePosition / _zoom) + _cameraPosition;
 
     private PlayerData _playerData;
     private Dictionary<byte, PlayerData>? _peersData = new();
@@ -60,8 +60,8 @@ public class GamingState : GameState
         _backgroundTileEngine = new(WORLD_WIDTH, WORLD_HEIGHT, 1, worldSeed, true);
         _tileEngine = new(WORLD_WIDTH, WORLD_HEIGHT, 1, worldSeed, false);
 
-        _tileEngine.UpdateVisibleChunks(new Vector2(), 1);
-        _backgroundTileEngine.UpdateVisibleChunks(new Vector2(), 1);
+        _tileEngine.UpdateVisibleChunks(Vector2.Zero, 1);
+        _backgroundTileEngine.UpdateVisibleChunks(Vector2.Zero, 1);
     }
 
     public override void Update(double deltaTime)
@@ -175,8 +175,7 @@ public class GamingState : GameState
 
         if (InputHandler.IsLeftMouseDown())
         {
-            Vector2 position = InputHandler.MousePosition / _zoom + _cameraPosition;
-            if (_tileEngine.PlaceTile(AssetManager.GetTexture("CoalTile"), position))
+            if (_tileEngine.PlaceTile(AssetManager.GetTexture("CoalTile"), _mouseWorldPos))
             {
                 //_ = App.SendPacketTcp(PacketId.PACKET_PLACE_TILE, new PlaceTilePacket() { Username = _playerData.Username, TextureName = "CoalTile", X = position.X, Y = position.Y});
             }
@@ -184,8 +183,7 @@ public class GamingState : GameState
 
         if (InputHandler.IsRightMouseDown())
         {
-            Vector2 mousePos = _mouseWorldPos;
-            if (_tileEngine.RemoveTile(mousePos))
+            if (_tileEngine.RemoveTile(_mouseWorldPos))
             {
                 //_ = App.SendPacketTcp(PacketId.PACKET_REMOVE_TILE, new RemoveTilePacket() { Username = _playerData.Username, X = mousePos.X, Y = mousePos.Y });
             }

@@ -18,9 +18,7 @@ public class Tile
         Texture = texture;
         Brightness = brightness;
 
-        Texture2D textureAtlas = App.TextureAtlas;
-
-        TexX = texture.SourceRectangle.X / textureAtlas.Width;
-        TexY = texture.SourceRectangle.Y / textureAtlas.Height;
+        TexX = texture.SourceRectangle.X / App.TextureAtlas.Width;
+        TexY = texture.SourceRectangle.Y / App.TextureAtlas.Height;
     }
 }

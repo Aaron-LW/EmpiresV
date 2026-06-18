@@ -2,8 +2,6 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Numerics;
-using System.Text;
-using System.Text.Json;
 using SDL3;
 using Smash;
 using Smash.Graphics;
@@ -290,7 +288,6 @@ public class App : Application
 
         if (tcpClient == null || connectedIndex == null) throw new Exception("Couldn't connect to server: Server not found :(");
         NetworkStream networkStream = tcpClient.GetStream();
-
 
         byte[] login = new LoginPacket(null) { Username = username }.Serialize();
         networkStream.Write(login);
