@@ -1,6 +1,5 @@
 using System.Drawing;
 using System.Numerics;
-using System.Text.Json;
 using SDL3;
 using Smash.Graphics;
 using Smash.Input;
@@ -19,14 +18,6 @@ public class MenuState : GameState
 
     public MenuState(StateResult previousStateResult) : base(previousStateResult)
     {
-        string username = "";
-
-        string dataFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EmpiresV", "data.json");
-        if (File.Exists(dataFile))
-        {
-            username = JsonSerializer.Deserialize<string>(File.ReadAllText(dataFile))!;
-        }
-
         _usernameField = new InputField()
         {
             X = 150,
@@ -35,7 +26,7 @@ public class MenuState : GameState
             Height = 50,
             BackgroundColor = Color.FromArgb(35, 35, 35),
             TextColor = Color.White,
-            Text = username,
+            Text = "",
             RequireInput = true
         };
 
@@ -124,7 +115,6 @@ public class MenuState : GameState
                 if (inputField.Selected)
                 {
                     inputField.SendTextInput(InputHandler.TextInput);
-                    File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EmpiresV", "data.json"), JsonSerializer.Serialize(_usernameField.Text!));
                 }
             }
         }
@@ -136,7 +126,6 @@ public class MenuState : GameState
                 if (inputField.Selected)
                 {
                     inputField.SendTextInput(InputHandler.IsKeyDown(SDL.Keycode.LCtrl) ? "BackspaceAll" : "Backspace");
-                    File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EmpiresV", "data.json"), JsonSerializer.Serialize(_usernameField.Text!));
                 }
             }
         }
@@ -196,7 +185,7 @@ public class MenuState : GameState
 
     protected override void OnStateFinish<MenuStateResult>(MenuStateResult menuStateResult)
     {
-        SDL.SetCursor(SDL.CreateSystemCursor(SDL.SystemCursor.Default));
+        SDL.SetCursor(SDL.GetDefaultCursor());
         base.OnStateFinish(menuStateResult);
     }
 }

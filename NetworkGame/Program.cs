@@ -27,7 +27,7 @@ internal static class Program
 
             SmashEngine.Init();
 
-            App application = new App(args.Contains("--game") || args.Contains("-g"), args.Contains("--host") || args.Contains("-h"));
+            App application = new App(args.Contains("--game") || args.Contains("-g"));
             application.Start();
 
             InputHandler.StartPollingTextInput();

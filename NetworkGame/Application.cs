@@ -35,7 +35,7 @@ public class App : Application
 
     private IState? _currentState;
 
-    public App(bool autoconnect, bool autohost)
+    public App(bool debugGame)
     {
         CreateWindowAndRenderer("Networkgame", 1080, 800, out _window, out _renderer);
         _window.SetWindowResizable(true);
@@ -58,39 +58,13 @@ public class App : Application
         _renderer.SetVSyncEnabled(false);
         _renderer.SetRenderBlendMode(BlendMode.Blend);
 
-        string dataFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EmpiresV", "data.json");
-        string? username = null;
-
-        if (File.Exists(dataFile))
+        if (debugGame)
         {
-            username = JsonSerializer.Deserialize<string>(File.ReadAllText(dataFile))!;
-        }
-
-        if (autoconnect)
-        {
-            SetState(new GamingState(new StateResult { PlayerData = new PlayerData() { Username = username ?? "Default name", Host = true, X = 0, Y = 0 }, Type = "lobby" }, Random.Shared.Next(100, 5000)));
+            SetState(new GamingState(new StateResult { PlayerData = new PlayerData() { Username = "Player", Host = true, X = 0, Y = 0 }, Type = "lobby" }, Random.Shared.Next(100, 5000)));
         }
         else
         {
             SetState(new MenuState(null!));
-        }
-
-        string datafolderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EmpiresV");
-        if (!Directory.Exists(datafolderPath))
-        {
-            Directory.CreateDirectory(datafolderPath);
-        }
-
-        if (autohost)
-        {
-            HostServer(new MenuStateResult()
-            {
-                PlayerData = new PlayerData() { Username = username ?? "Default name", Host = true},
-                Type = "menu",
-                Ip = "127.0.0.1"
-            });
-
-            //SetState(new GamingState(new StateResult { PlayerData = new PlayerData() { Username = username ?? "Default name", Host = true, X = 0, Y = 0 }, Type = "lobby" }, Random.Shared.Next(100, 5000)));
         }
     }
 
