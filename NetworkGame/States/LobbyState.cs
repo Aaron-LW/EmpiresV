@@ -1,22 +1,16 @@
 using Color = System.Drawing.Color;
 using Smash.Graphics;
 using System.Numerics;
-using System.Net.Sockets;
-using System.Net;
 using Smash;
-using System.Text.Json;
 using Smash.Input;
 using SDL3;
 
 public class LobbyState : GameState
 {
-    private string? _localIp;
     private Texture2D _hostCrown;
 
-    private readonly string _serverIp;
-
     private PlayerData _userPlayerData;
-    private Dictionary<string, PlayerData> _playerData = new();
+    private Dictionary<byte, PlayerData> _playerData = new();
     private readonly object _playerDataLock = new();
 
     private InputField _chatInputField;
@@ -28,14 +22,11 @@ public class LobbyState : GameState
 
     private Button? _startGameButton;
 
-    public LobbyState(StateResult previousStateResult, string serverIp) : base(previousStateResult)
+    public LobbyState(StateResult previousStateResult) : base(previousStateResult)
     {
-        _serverIp = serverIp;
-
-        _localIp = GetLocalIp();
         _hostCrown = AssetManager.GetTexture("HostCrown");
 
-        _userPlayerData = new PlayerData { Host = previousStateResult.PlayerData.Host, Username = previousStateResult.PlayerData.Username, Id = byte.MaxValue };
+        _userPlayerData = new PlayerData { Host = previousStateResult.PlayerData.Host, Username = previousStateResult.PlayerData.Username };
 
         _chatInputField = new()
         {
@@ -135,7 +126,6 @@ public class LobbyState : GameState
         renderer.Clear(Color.FromArgb(20, 20, 20));
 
         renderer.RenderText(App.Font, "Lobby", new Vector2(20), Color.White);
-        //renderer.RenderText(App.Font, $"Server Ip: {_serverIp}", new Vector2(App.Font.MeasureString("Lobby").X + 40, 20), Color.White);
 
         List<PlayerData> playerData;
         lock (_playerDataLock)
@@ -175,27 +165,13 @@ public class LobbyState : GameState
             if (position.Y < 0) continue;
             
             if (_chat[i].username != string.Empty)
-                renderer.RenderText(App.Font, $"{_chat[i].username.Trim()}: {_chat[i].message}", Vector2.Round(position), Color.White);
+                renderer.RenderText(App.Font, $"{_chat[i].username}: {_chat[i].message}", Vector2.Round(position), Color.White);
             else
                 renderer.RenderText(App.Font, $"{_chat[i].message}", Vector2.Round(position), Color.MediumSpringGreen);
 
         }
 
         SDL.SetRenderClipRect(renderer.Handle, 0);
-    }
-
-    private string? GetLocalIp()
-    {
-        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, 0);
-        socket.Connect("8.8.8.8", 65530);
-
-        var endPoint = socket.LocalEndPoint as IPEndPoint;
-        if (endPoint != null)
-        {
-            return endPoint.Address.ToString();
-        }
-        
-        return null;
     }
 
     public override void ForwardPacket(byte[] data)
@@ -205,36 +181,30 @@ public class LobbyState : GameState
         byte packetId = data[0];
         byte playerId = data[^1];
 
-        string? playerName = null;
-
-        foreach (PlayerData playerData in _playerData.Values)
-            if (playerData.Id == playerId) playerName = playerData.Username;
-        
-
         switch (packetId)
         {
             case PacketId.PACKET_JOIN:
                 JoinPacket joinPacket = new(data);
-                lock (_playerDataLock) _playerData!.Add(joinPacket.Username!, new PlayerData() { Username = joinPacket.Username!, Id = playerId });
+                lock (_playerDataLock) _playerData!.Add(playerId, new PlayerData() { Username = joinPacket.Username! });
                 Console.WriteLine("Received join packet from " + joinPacket.Username);
                 _chat.Add(("", $"{joinPacket.Username} has joined the game"));
                 break;
 
             case PacketId.PACKET_PLAYERDATA:
                 PlayerDataPacket playerDataPacket = new(data);
-                lock (_playerDataLock) _playerData![playerDataPacket.PlayerData!.Username] = playerDataPacket.PlayerData!;
-                Console.WriteLine("Received player data packet from " + playerDataPacket.PlayerData.Username);
+                lock (_playerDataLock) _playerData![playerId] = playerDataPacket.PlayerData!;
+                Console.WriteLine("Received player data packet from " + playerDataPacket.PlayerData!.Username);
                 break;
 
             case PacketId.PACKET_PING:
                 PingPacket pingPacket = new(data);
-                _chat.Add((playerName!, pingPacket.Message));
+                _chat.Add((_playerData[playerId].Username, pingPacket.Message));
                 _preferredChatScroll = Math.Min(-_chat.Count * 40 + _chatRectangle.Height - 25, 0);
                 break;
 
             case PacketId.PACKET_LEAVE:
-                _chat.Add(("", $"{playerName} has left the game"));
-                _playerData!.Remove(playerName!);
+                _chat.Add(("", $"{_playerData[playerId].Username} has left the game"));
+                _playerData!.Remove(playerId);
                 break;
 
             case PacketId.PACKET_START_GAME:

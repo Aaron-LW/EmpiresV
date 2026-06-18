@@ -19,6 +19,8 @@ public class App : Application
     public static float WindowWidth => _window!.Width;
     public static float WindowHeight => _window!.Height;
 
+    public static byte PlayerId { get; private set; } = byte.MaxValue;
+
     private static Window? _window;
     private Renderer _renderer;
 
@@ -66,7 +68,7 @@ public class App : Application
 
         if (autoconnect)
         {
-            SetState(new GamingState(new StateResult { PlayerData = new PlayerData() { Username = username ?? "Default name", Host = true, X = 0, Y = 0, Id = byte.MaxValue }, Type = "lobby" }, Random.Shared.Next(100, 5000)));
+            SetState(new GamingState(new StateResult { PlayerData = new PlayerData() { Username = username ?? "Default name", Host = true, X = 0, Y = 0 }, Type = "lobby" }, Random.Shared.Next(100, 5000)));
         }
         else
         {
@@ -83,7 +85,7 @@ public class App : Application
         {
             HostServer(new MenuStateResult()
             {
-                PlayerData = new PlayerData() { Username = username ?? "Default name", Host = true, Id = byte.MaxValue},
+                PlayerData = new PlayerData() { Username = username ?? "Default name", Host = true},
                 Type = "menu",
                 Ip = "127.0.0.1"
             });
@@ -146,7 +148,7 @@ public class App : Application
                         Console.WriteLine("Connected to Server!");
 
                         menuStateResult.PlayerData.Host = host;
-                        SetState(new LobbyState(menuStateResult, _serverEndPoint!.Address.ToString()));
+                        SetState(new LobbyState(menuStateResult));
                     }
                     else
                     {
@@ -212,7 +214,6 @@ public class App : Application
 
 
                     (bool success, bool host) = TryConnect(menuStateResult.PlayerData.Username, menuStateResult.Ip);
-                    Console.WriteLine($"Server Ip: {GetLocalIp()}");
 
                     if (!success)
                     {
@@ -223,7 +224,7 @@ public class App : Application
                     Console.WriteLine($"Host: {host}");
 
                     menuStateResult.PlayerData.Host = host;
-                    SetState(new LobbyState(menuStateResult, GetLocalIp()!));
+                    SetState(new LobbyState(menuStateResult));
                 }
             }
         };
@@ -269,13 +270,13 @@ public class App : Application
         await Task.Run(async () => _networkStream.WriteAsync(FramePacket(data)));
     }
 
-    //public static async Task SendPacketUdp<T>(byte id, T packet) where T : Packet
-    //{
-    //    if (_udpClient == null) return;
+    public static async Task SendPacketUdp(byte[] data)
+    {
+        if (_udpClient == null) return;
 
-    //    byte[] data = [id, .. Encoding.UTF8.GetBytes(JsonSerializer.Serialize(packet))];
-    //    await _udpClient.SendAsync(data, data.Length, _serverEndPoint);
-    //}
+        byte[] framedData = [..data, PlayerId];
+        await _udpClient.SendAsync(FramePacket(framedData), framedData.Length + 4, _serverEndPoint);
+    }
 
     private static byte[] FramePacket(byte[] packet)
     {
@@ -320,7 +321,7 @@ public class App : Application
         byte[] login = new LoginPacket(null) { Username = username }.Serialize();
         networkStream.Write(login);
 
-        byte[] connectionBuffer = new byte[2];
+        byte[] connectionBuffer = new byte[3];
         int bytesRead = networkStream.Read(connectionBuffer);
 
         if (connectionBuffer[0] != 0x00)
@@ -345,6 +346,7 @@ public class App : Application
         else
         {
             bool host = connectionBuffer[1] == 0x01;
+            PlayerId = connectionBuffer[2];
 
             _networkStream = networkStream;
             
@@ -353,28 +355,13 @@ public class App : Application
 
             _serverEndPoint = new IPEndPoint(addresses[(int)connectedIndex!], 5000);
 
-            //SendPacketUdp(PacketId.PACKET_UDP_INIT, new Packet { Username = username }).GetAwaiter();
+            SendPacketUdp([PacketId.PACKET_UDP_INIT]).GetAwaiter();
 
             _ = Task.Run(async () => ReceivePackets(false));
             _ = Task.Run(async () => ReceivePackets(true));
 
             return (true, host);
         }
-    }
-
-
-    private string? GetLocalIp()
-    {
-        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, 0);
-        socket.Connect("8.8.8.8", 65530);
-
-        var endPoint = socket.LocalEndPoint as IPEndPoint;
-        if (endPoint != null)
-        {
-            return endPoint.Address.ToString();
-        }
-        
-        return null;
     }
 
     private async Task ReceivePackets(bool udp)

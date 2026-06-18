@@ -91,11 +91,11 @@ public class MenuState : GameState
             {
                 if (_ipField.Text == string.Empty || _ipField.Text == null)
                 {
-                    OnStateFinish(new MenuStateResult() { Ip = "localhost", Type = "menu", PlayerData = new() { Username = _usernameField.Text!, Host = _hostServer, Id = byte.MaxValue } });
+                    OnStateFinish(new MenuStateResult() { Ip = "localhost", Type = "menu", PlayerData = new() { Username = _usernameField.Text!, Host = _hostServer} });
                 }
                 else if (_usernameField.Text != string.Empty && _usernameField.Text != null)
                 {
-                    OnStateFinish(new MenuStateResult() { Ip = _ipField.Text, Type = "menu", PlayerData = new() { Username = _usernameField.Text, Host = _hostServer, Id = byte.MaxValue } });
+                    OnStateFinish(new MenuStateResult() { Ip = _ipField.Text, Type = "menu", PlayerData = new() { Username = _usernameField.Text, Host = _hostServer } });
                 }
             }
 
@@ -104,7 +104,7 @@ public class MenuState : GameState
                 if (_usernameField.Text != string.Empty && _usernameField.Text != null)
                 {
                     _hostServer = true;
-                    OnStateFinish(new MenuStateResult() { Ip = "localhost", Type = "menu", PlayerData = new() { Username = _usernameField.Text, Host = _hostServer, Id = byte.MaxValue } });
+                    OnStateFinish(new MenuStateResult() { Ip = "localhost", Type = "menu", PlayerData = new() { Username = _usernameField.Text, Host = _hostServer } });
                 }
             }
         }
@@ -113,7 +113,7 @@ public class MenuState : GameState
         {
             if (_usernameField.Text != string.Empty && _usernameField.Text != null &&  _ipField.Text != string.Empty && _ipField.Text != null)
             {
-                OnStateFinish(new MenuStateResult() { Ip = _ipField.Text, Type = "menu", PlayerData = new PlayerData() { Username = _usernameField.Text, Host = _hostServer, Id = byte.MaxValue } });
+                OnStateFinish(new MenuStateResult() { Ip = _ipField.Text, Type = "menu", PlayerData = new PlayerData() { Username = _usernameField.Text, Host = _hostServer } });
             }
         }
 

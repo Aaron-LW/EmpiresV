@@ -36,7 +36,7 @@ public class GamingState : GameState
     private Vector2 _mouseWorldPos => InputHandler.MousePosition / _zoom + _cameraPosition;
 
     private PlayerData _playerData;
-    private Dictionary<string, PlayerData>? _peersData;
+    private Dictionary<byte, PlayerData>? _peersData = new();
 
     private bool _chatFocused = false;
     private float _chatCooldown;
@@ -44,8 +44,6 @@ public class GamingState : GameState
 
     private float _elapsedTime;
     private long _ramUsage;
-
-    private Vector2 _lastSentMovePacketLocation = new();
 
     private List<(string username, string message)> _chatHistory = new();
 
@@ -57,7 +55,6 @@ public class GamingState : GameState
         if (previousStateResult is LobbyStateResult lobbyStateResult)
         {
             _chatHistory = lobbyStateResult.ChatHistory;
-            _chatCooldown = CHAT_BASE_COOLDOWN;
         }
 
         _backgroundTileEngine = new(WORLD_WIDTH, WORLD_HEIGHT, 1, worldSeed, true);
@@ -143,15 +140,14 @@ public class GamingState : GameState
         _cameraX = _playerData.X - (App.WindowWidth / 2 / _zoom) + (playerTexture.Width / 2);
         _cameraY = _playerData.Y - (App.WindowHeight / 2 / _zoom) + (playerTexture.Height / 2);
 
-        if (movementVector != Vector2.Zero && _cameraPosition != _lastSentMovePacketLocation)
+        if (movementVector != Vector2.Zero)
         {
-            //if (Program.TCPOnly)
-            //    _ = App.SendPacketTcp(PacketId.PACKET_UPDATE_POS, new PositionUpdatePacket() { Username = _playerData.Username, X = _playerData.X, Y = _playerData.Y });
-            //else
-            //    _ = App.SendPacketUdp(PacketId.PACKET_UPDATE_POS, new PositionUpdatePacket() { Username = _playerData.Username, X = _playerData.X, Y = _playerData.Y });
+            byte[] positionUpdatePacket = new PositionUpdatePacket(null) { X = _playerData.X, Y = _playerData.Y }.Serialize();
+            if (Program.TCPOnly)
+                _ = App.SendPacketTcp(positionUpdatePacket);
+            else
+                _ = App.SendPacketUdp(positionUpdatePacket);
 
-            _ = App.SendPacketTcp(new PositionUpdatePacket(null) {  X = _playerData.X, Y = _playerData.Y }.Serialize() );
-            _lastSentMovePacketLocation = _cameraPosition;
 
             _backgroundTileEngine.UpdateVisibleChunks(_cameraPosition, _preferredZoom);
             _tileEngine.UpdateVisibleChunks(_cameraPosition, _preferredZoom);
@@ -253,28 +249,23 @@ public class GamingState : GameState
         byte packetId = data[0];
         byte playerId = data[^1];
 
-        string? playerName = null;
-
-        foreach (PlayerData playerData in _peersData!.Values)
-            if (playerData.Id == playerId) playerName = playerData.Username;
-
         switch (packetId)
         {
             case PacketId.PACKET_UPDATE_POS:
                 PositionUpdatePacket positionUpdatePacket = new(data);
-                _peersData![playerName!].X = positionUpdatePacket.X;
-                _peersData![playerName!].Y = positionUpdatePacket.Y;
+                _peersData![playerId].X = positionUpdatePacket.X;
+                _peersData![playerId].Y = positionUpdatePacket.Y;
                 break;
 
             case PacketId.PACKET_LEAVE:
-                Console.WriteLine("Received leave packet from " + playerName);
-                SendChatMessage("", $"{playerName} has left the game");
-                _peersData!.Remove(playerName!);
+                Console.WriteLine("Received leave packet from " + _peersData![playerId].Username);
+                SendChatMessage("", $"{_peersData[playerId].Username} has left the game");
+                _peersData!.Remove(playerId);
                 break;
 
             case PacketId.PACKET_PING:
                 PingPacket pingPacket = new(data);
-                SendChatMessage(playerName!, pingPacket.Message);
+                SendChatMessage(_peersData![playerId].Username, pingPacket.Message);
                 _chatCooldown = CHAT_BASE_COOLDOWN;
                 break;
         }

@@ -23,10 +23,10 @@ public class Server
 
         Console.Write("Starting UDP server...  ");
 
-        //_udpServer = new UdpClient(AddressFamily.InterNetworkV6);
-        //_udpServer.Client.DualMode = true;
-        //_udpServer.Client.Bind(new IPEndPoint(IPAddress.IPv6Any, 5000));
-        //_ = HandleUdp();
+        _udpServer = new UdpClient(AddressFamily.InterNetworkV6);
+        _udpServer.Client.DualMode = true;
+        _udpServer.Client.Bind(new IPEndPoint(IPAddress.IPv6Any, 5000));
+        _ = HandleUdp();
 
         Console.WriteLine("Success!");
         Console.WriteLine("SERVER_READY");
@@ -57,6 +57,8 @@ public class Server
                 continue;
             }
 
+            byte playerId = (byte)_clients.Count;
+
             if (_clients.Any(c => c.Username == loginRequestPacket.Username))
             {
                 Console.WriteLine($"Denying client because username {loginRequestPacket.Username} has already been taken");
@@ -67,7 +69,7 @@ public class Server
             }
             else
             {
-                await clientStream.WriteAsync(new ReadOnlyMemory<byte>([0x00, host ? (byte)0x01 : (byte)0x00]));
+                await clientStream.WriteAsync(new ReadOnlyMemory<byte>([0x00, host ? (byte)0x01 : (byte)0x00, playerId]));
             }
 
 
@@ -75,8 +77,9 @@ public class Server
             {
                 TcpClient = client,
                 Username = loginRequestPacket.Username,
-                PlayerData = new() { Host = host, Username = loginRequestPacket.Username, Id = (byte)_clients.Count },
-                Host = host
+                PlayerData = new() { Host = host, Username = loginRequestPacket.Username },
+                Host = host,
+                Id = playerId
             };
 
             lock (_lock)
@@ -99,12 +102,10 @@ public class Server
             case PacketId.PACKET_UPDATE_POS:
                 PositionUpdatePacket positionUpdatePacket = new(data);
                 
-                //if (Program.TCPOnly)
-                //    await BroadCastPacketTcp(PacketId.PACKET_UPDATE_POS, positionUpdatePacket);
-                //else
-                //    _ = BroadCastPacketUdp(PacketId.PACKET_UPDATE_POS, positionUpdatePacket);
-
-                await BroadCastPacketTcp(data, playerClient);
+                if (Program.TCPOnly)
+                    await BroadCastPacketTcp(data, playerClient);
+                else
+                    _ = BroadCastPacketUdp(data, playerClient);
 
                 playerClient.PlayerData.X = positionUpdatePacket.X;
                 playerClient.PlayerData.Y = positionUpdatePacket.Y;
@@ -133,7 +134,7 @@ public class Server
                 {
                     if (otherClient == playerClient) continue;
                     NetworkStream stream = playerClient.TcpClient.GetStream();
-                    byte[] playerData = [..new PlayerDataPacket(null) { PlayerData = otherClient.PlayerData }.Serialize(), otherClient.PlayerData.Id];
+                    byte[] playerData = [..new PlayerDataPacket(null) { PlayerData = otherClient.PlayerData }.Serialize(), otherClient.Id];
                     byte[] framedData = [..BitConverter.GetBytes(playerData.Length), ..playerData];
                     await stream.WriteAsync(framedData);
                 }
@@ -192,19 +193,20 @@ public class Server
         }
     }
 
-    //private async Task HandleUdp()
-    //{
-    //    while (true)
-    //    {
-    //        UdpReceiveResult result = await _udpServer!.ReceiveAsync();
+    private async Task HandleUdp()
+    {
+        while (true)
+        {
+            UdpReceiveResult result = await _udpServer!.ReceiveAsync();
+            byte playerId = result.Buffer[^1];
 
-    //        PlayerClient? client = _clients.FirstOrDefault(c => c.Username == packet!.Username);
-    //        if (client != null)
-    //        {
-    //            await HandlePacket(result.Buffer[0], json, client, result);
-    //        }
-    //    }
-    //}
+            PlayerClient? client = _clients.FirstOrDefault(c => c.Id == playerId);
+            if (client != null)
+            {
+                await HandlePacket(result.Buffer[4..result.Buffer.Length], client, result);
+            }
+        }
+    }
 
     private static bool TryExtractPacket(List<byte> buffer, out byte[]? packet)
     {
@@ -240,12 +242,7 @@ public class Server
 
             try
             {
-                byte[] realData = new byte[data.Length + 5];
-                BitConverter.GetBytes(realData.Length + 1).CopyTo(realData, 0);
-                data.CopyTo(realData, 4);
-                realData[^1] = sender.PlayerData.Id;
-
-                await networkStream.WriteAsync(realData, 0, realData.Length);
+                await networkStream.WriteAsync(FramePacket(data, sender), 0, data.Length + 5);
             }
             catch (Exception ex)
             {
@@ -258,14 +255,22 @@ public class Server
         }
     }
 
-    //private async Task BroadCastPacketUdp<T>(byte id, T packet) where T : Packet
-    //{
-    //    foreach (PlayerClient playerClient in _clients)
-    //    {
-    //        if (packet.Username == playerClient.Username) continue;
+    private async Task BroadCastPacketUdp(byte[] data, PlayerClient sender)
+    {
+        foreach (PlayerClient playerClient in _clients)
+        {
+            if (sender.Id == playerClient.Id) continue;
 
-    //        byte[] data = [id, .. Encoding.UTF8.GetBytes(JsonSerializer.Serialize(packet) + "\n")];
-    //        await _udpServer!.SendAsync(data, data.Length, playerClient.UdpEndPoint);
-    //    }
-    //}
+            await _udpServer!.SendAsync(FramePacket(data, sender), data.Length + 5, playerClient.UdpEndPoint);
+        }
+    }
+
+    private byte[] FramePacket(byte[] packet, PlayerClient sender)
+    {
+        byte[] data = new byte[packet.Length + 5];
+        BitConverter.GetBytes(packet.Length).CopyTo(data, 0);
+        packet.CopyTo(data, 4);
+        data[^1] = sender.Id;
+        return data;
+    }
 }
