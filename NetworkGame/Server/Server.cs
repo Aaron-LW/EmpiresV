@@ -30,8 +30,8 @@ public class Server
 
         Console.WriteLine("Success!");
         Console.WriteLine("SERVER_READY");
-        
-        Console.WriteLine($"Server start timestamp: {DateTime.Now}");
+
+        Console.WriteLine($"Server start timestamp: {DateTime.UtcNow}");
 
         while (true)
         {
