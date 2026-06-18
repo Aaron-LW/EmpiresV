@@ -11,6 +11,7 @@ public class Server
 
     public async Task Main()
     {
+
         Console.Write("Starting TCP server...  ");
 
         TcpListener server = new TcpListener(IPAddress.IPv6Any, 5000);
@@ -29,6 +30,8 @@ public class Server
 
         Console.WriteLine("Success!");
         Console.WriteLine("SERVER_READY");
+        
+        Console.WriteLine($"Server start timestamp: {DateTime.Now}");
 
         while (true)
         {
