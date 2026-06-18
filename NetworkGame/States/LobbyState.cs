@@ -143,7 +143,7 @@ public class LobbyState : GameState
             
             Vector2 textPosition = currentPosition + new Vector2(rectangle.Height / 2) - new Vector2(0, App.Font.MeasureString(playerData[i].Username).Y / 2); 
             renderer.RenderText(App.Font, playerData[i].Username, textPosition, Color.White);
-            
+
             if (playerData[i].Host)
             {
                 renderer.RenderTexture(_hostCrown, textPosition + new Vector2(App.Font.MeasureString(playerData[i].Username).X + 10, 0), Color.White, 2);
@@ -203,8 +203,9 @@ public class LobbyState : GameState
                 break;
 
             case PacketId.PACKET_LEAVE:
+                Console.WriteLine("Received leave packet from " + _playerData[playerId].Username);
                 _chat.Add(("", $"{_playerData[playerId].Username} has left the game"));
-                _playerData!.Remove(playerId);
+                lock (_playerDataLock) _playerData!.Remove(playerId);
                 break;
 
             case PacketId.PACKET_START_GAME:
@@ -218,6 +219,20 @@ public class LobbyState : GameState
                     ChatHistory = _chat
                 });
 
+                break;
+
+            case PacketId.PACKET_UPDATE_HOST:
+                UpdateHostPacket updateHostPacket = new(data);
+                if (updateHostPacket.NewHostPlayerId == App.PlayerId)
+                {
+                    _userPlayerData.Host = true;
+                    Console.WriteLine("Received update host packet; I am the new host");
+                } 
+                else 
+                {
+                    _playerData[updateHostPacket.NewHostPlayerId].Host = true;
+                    Console.WriteLine("Received update host packet; new host is " + _playerData[updateHostPacket.NewHostPlayerId].Host);
+                }
                 break;
         }
         

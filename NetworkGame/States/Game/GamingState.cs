@@ -268,6 +268,12 @@ public class GamingState : GameState
                 SendChatMessage(_peersData![playerId].Username, pingPacket.Message);
                 _chatCooldown = CHAT_BASE_COOLDOWN;
                 break;
+
+            case PacketId.PACKET_UPDATE_HOST:
+                UpdateHostPacket updateHostPacket = new(data);
+                if (updateHostPacket.NewHostPlayerId == App.PlayerId) _playerData.Host = true;
+                else _peersData![updateHostPacket.NewHostPlayerId].Host = true;
+                break;
         }
 
         base.ForwardPacket(data);

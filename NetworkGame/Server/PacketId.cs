@@ -11,4 +11,5 @@ public static class PacketId
     public const byte PACKET_LOGIN =        0x08; // 8
     public const byte PACKET_REMOVE_TILE =  0x09; // 9
     public const byte PACKET_REQUEST_DATA = 0x0A; // 10
+    public const byte PACKET_UPDATE_HOST =  0x0B; // 11
 }

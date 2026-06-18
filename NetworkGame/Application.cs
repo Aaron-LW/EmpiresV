@@ -337,6 +337,10 @@ public class App : Application
                 case 0x02:
                     Console.WriteLine("Game has already been started");
                     break;
+
+                case 0x03:
+                    Console.WriteLine("Server is full");
+                    break;
             }
 
             networkStream.Close();

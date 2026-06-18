@@ -48,28 +48,44 @@ public class Server
 
             bool host = _clients.Count == 0;
 
-            if (_gameStarted)
-            {
-                Console.WriteLine($"Denying client because the game has already been started");
-
-                await clientStream.WriteAsync(new ReadOnlyMemory<byte>([0x02]));
-                client.Close();
-                continue;
-            }
-
-            byte playerId = (byte)_clients.Count;
+            byte error = 0x00;
+            byte? playerId = GetFirstFreeId();
 
             if (_clients.Any(c => c.Username == loginRequestPacket.Username))
-            {
-                Console.WriteLine($"Denying client because username {loginRequestPacket.Username} has already been taken");
+                error = 0x01;
 
-                await clientStream.WriteAsync(new ReadOnlyMemory<byte>([0x01]));
+            if (_gameStarted) 
+                error = 0x02;
+
+            if (playerId == null)
+                error = 0x03;
+
+
+            if (error != 0)
+            {
+                switch (error)
+                {
+                    case 0x01:
+                        Console.WriteLine($"Denying client because username {loginRequestPacket.Username} has already been taken");
+                        break;
+
+                    case 0x02:
+                        Console.WriteLine($"Denying client because the game has already been started");
+                        break;
+
+                    case 0x03:
+                        Console.WriteLine($"Denying client because the server is full");
+                        break;
+                }
+
+
+                await clientStream.WriteAsync(new ReadOnlyMemory<byte>([error]));
                 client.Close();
                 continue;
             }
             else
             {
-                await clientStream.WriteAsync(new ReadOnlyMemory<byte>([0x00, host ? (byte)0x01 : (byte)0x00, playerId]));
+                await clientStream.WriteAsync(new ReadOnlyMemory<byte>([0x00, host ? (byte)0x01 : (byte)0x00, (byte)playerId!]));
             }
 
 
@@ -79,7 +95,7 @@ public class Server
                 Username = loginRequestPacket.Username,
                 PlayerData = new() { Host = host, Username = loginRequestPacket.Username },
                 Host = host,
-                Id = playerId
+                Id = (byte)playerId
             };
 
             lock (_lock)
@@ -88,7 +104,7 @@ public class Server
             }
 
             await Task.Run(async () => BroadCastPacketTcp(new JoinPacket(null) { Username = loginRequestPacket.Username }.Serialize(), playerClient));
-            Console.WriteLine($"{loginRequestPacket.Username} has joined the server " + (host ? "as host" : ""));
+            Console.WriteLine($"{loginRequestPacket.Username} has joined the server " + (host ? "as host " : "") + "with id " + playerId);
             _ = HandleClientTcp(playerClient);
         }
     }
@@ -166,7 +182,6 @@ public class Server
                 {
                     await HandlePacket(packet!, playerClient);
                 }
-
             }
         }
         catch (Exception ex)
@@ -178,9 +193,19 @@ public class Server
             await BroadCastPacketTcp(new LeavePacket(null) { Username = playerClient.Username }.Serialize(), playerClient);
             Console.WriteLine($"{playerClient.Username} has left");
 
+            bool playerWasHost = playerClient.Host;
+
             lock (_lock)
             {
                 _clients.Remove(playerClient);
+            }
+
+            if (playerWasHost && _clients.Count > 0)
+            {
+                Console.WriteLine($"Sending update host packet; The new host is " + _clients[0].Username);
+                await BroadCastPacketTcp(new UpdateHostPacket(null) { NewHostPlayerId = _clients[0].Id}.Serialize(), null);
+                _clients[0].PlayerData.Host = true;
+                _clients[0].Host = true;
             }
 
             playerClient.TcpClient.Dispose();
@@ -230,11 +255,11 @@ public class Server
         return true;
     }
 
-    private async Task BroadCastPacketTcp(byte[] data, PlayerClient sender)
+    private async Task BroadCastPacketTcp(byte[] data, PlayerClient? sender)
     {
         foreach (PlayerClient playerClient in _clients)
         {
-            if (sender.Username == playerClient.Username) continue;
+            if (sender?.Id == playerClient.Id) continue;
 
             NetworkStream networkStream = playerClient.TcpClient.GetStream();
 
@@ -242,7 +267,7 @@ public class Server
 
             try
             {
-                await networkStream.WriteAsync(FramePacket(data, sender), 0, data.Length + 5);
+                await networkStream.WriteAsync(FramePacket(data, sender?.Id ?? byte.MaxValue), 0, data.Length + 5);
             }
             catch (Exception ex)
             {
@@ -255,22 +280,33 @@ public class Server
         }
     }
 
-    private async Task BroadCastPacketUdp(byte[] data, PlayerClient sender)
+    private async Task BroadCastPacketUdp(byte[] data, PlayerClient? sender)
     {
         foreach (PlayerClient playerClient in _clients)
         {
-            if (sender.Id == playerClient.Id) continue;
+            if (sender?.Id == playerClient.Id) continue;
 
-            await _udpServer!.SendAsync(FramePacket(data, sender), data.Length + 5, playerClient.UdpEndPoint);
+            await _udpServer!.SendAsync(FramePacket(data, sender?.Id ?? byte.MaxValue), data.Length + 5, playerClient.UdpEndPoint);
         }
     }
 
-    private byte[] FramePacket(byte[] packet, PlayerClient sender)
+    private byte[] FramePacket(byte[] packet, byte senderId)
     {
         byte[] data = new byte[packet.Length + 5];
         BitConverter.GetBytes(packet.Length).CopyTo(data, 0);
         packet.CopyTo(data, 4);
-        data[^1] = sender.Id;
+        data[^1] = senderId;
         return data;
+    }
+
+    private byte? GetFirstFreeId()
+    {
+        for (int i = 0; i < 255; i++)
+        {
+            if (_clients.Any(c => c.Id == i)) continue;
+            return (byte)i;
+        }
+
+        return null;
     }
 }
