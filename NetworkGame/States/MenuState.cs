@@ -176,7 +176,7 @@ public class MenuState : GameState
         _usernameField.Render(renderer);
 
         Vector2 ipFieldPosition = Vector2.Round(_ipField.Position + new Vector2(_ipField.Width / 2, -35) - new Vector2(App.Font.MeasureString("Server ip").X / 2, 0));
-        renderer.RenderText(AssetManager.GetFont("Roboto", App.POINT_SIZE), "Server ip", ipFieldPosition, Color.White);
+        renderer.RenderText(AssetManager.Get<Font>("Roboto"), "Server ip", ipFieldPosition, Color.White);
         _ipField.Render(renderer);
 
         _connectButton.Render(renderer);

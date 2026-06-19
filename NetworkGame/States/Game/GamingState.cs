@@ -136,7 +136,7 @@ public class GamingState : GameState
         _playerData.X += movementVector.X * (CAMERA_SPEED + sprintModifier) * (float)deltaTime;
         _playerData.Y += movementVector.Y * (CAMERA_SPEED + sprintModifier) * (float)deltaTime;
 
-        Texture2D playerTexture = AssetManager.GetTexture("mogus");
+        Texture2D playerTexture = AssetManager.Get<Texture2D>("mogus");
         _cameraX = _playerData.X - (App.WindowWidth / 2 / _zoom) + (playerTexture.Width / 2);
         _cameraY = _playerData.Y - (App.WindowHeight / 2 / _zoom) + (playerTexture.Height / 2);
 
@@ -158,7 +158,7 @@ public class GamingState : GameState
             float previousZoom = _preferredZoom;
 
             _preferredZoom += InputHandler.ScrollWheelDelta / (20 / _zoom);
-            _preferredZoom = Math.Clamp(_preferredZoom, 0.1f, 2f);
+            _preferredZoom = Math.Clamp(_preferredZoom, 0.01f, 2f);
 
             float greaterZoom = Math.Min(previousZoom, _preferredZoom);
             _tileEngine.UpdateVisibleChunks(_cameraPosition, greaterZoom);
@@ -175,9 +175,10 @@ public class GamingState : GameState
 
         if (InputHandler.IsLeftMouseDown())
         {
-            if (_tileEngine.PlaceTile(AssetManager.GetTexture("CoalTile"), _mouseWorldPos))
+            int textureId = AssetManager.GetAssetId("CoalTile");
+            if (_tileEngine.PlaceTile(AssetManager.Get<Texture2D>(textureId), _mouseWorldPos))
             {
-                //_ = App.SendPacketTcp(PacketId.PACKET_PLACE_TILE, new PlaceTilePacket() { Username = _playerData.Username, TextureName = "CoalTile", X = position.X, Y = position.Y});
+                _ = App.SendPacketTcp(new PlaceTilePacket(null) { X = (int)_mouseWorldPos.X, Y = (int)_mouseWorldPos.Y, TextureId = textureId }.Serialize());
             }
         }
 
@@ -185,7 +186,7 @@ public class GamingState : GameState
         {
             if (_tileEngine.RemoveTile(_mouseWorldPos))
             {
-                //_ = App.SendPacketTcp(PacketId.PACKET_REMOVE_TILE, new RemoveTilePacket() { Username = _playerData.Username, X = mousePos.X, Y = mousePos.Y });
+                _ = App.SendPacketTcp(new RemoveTilePacket(null) { X = (int)_mouseWorldPos.X, Y = (int)_mouseWorldPos.Y }.Serialize());
             }
         }
     }
@@ -198,15 +199,15 @@ public class GamingState : GameState
         _tileEngine.Render(renderer, _cameraPosition);
 
         (int x, int y) selectorPos = TileEngine.AlignToGrid((int)_mouseWorldPos.X, (int)_mouseWorldPos.Y);
-        renderer.RenderTexture(AssetManager.GetTexture("Selector"), (new Vector2(selectorPos.x, selectorPos.y) - _cameraPosition) * _zoom, Color.White, _zoom);
+        renderer.RenderTexture(AssetManager.Get<Texture2D>("Selector"), (new Vector2(selectorPos.x, selectorPos.y) - _cameraPosition) * _zoom, Color.White, _zoom);
 
-        renderer.RenderTexture(AssetManager.GetTexture("mogus"), (_playerData.Position - _cameraPosition) * _zoom, Color.White, _zoom);
+        renderer.RenderTexture(AssetManager.Get<Texture2D>("mogus"), (_playerData.Position - _cameraPosition) * _zoom, Color.White, _zoom);
 
         if (_peersData != null)
         {
             foreach (var peer in _peersData)
             {
-                renderer.RenderTexture(AssetManager.GetTexture("mogus"), (peer.Value.Position - _cameraPosition) * _zoom, Color.White, _zoom);
+                renderer.RenderTexture(AssetManager.Get<Texture2D>("mogus"), (peer.Value.Position - _cameraPosition) * _zoom, Color.White, _zoom);
             }
         }
 
@@ -271,6 +272,16 @@ public class GamingState : GameState
                 UpdateHostPacket updateHostPacket = new(data);
                 if (updateHostPacket.NewHostPlayerId == App.PlayerId) _playerData.Host = true;
                 else _peersData![updateHostPacket.NewHostPlayerId].Host = true;
+                break;
+
+            case PacketId.PACKET_PLACE_TILE:
+                PlaceTilePacket placeTilePacket = new(data);
+                _tileEngine.PlaceTile(AssetManager.Get<Texture2D>(placeTilePacket.TextureId), new Vector2(placeTilePacket.X, placeTilePacket.Y));
+                break;
+
+            case PacketId.PACKET_REMOVE_TILE:
+                RemoveTilePacket removeTilePacket = new(data);
+                _tileEngine.RemoveTile(new Vector2(removeTilePacket.X, removeTilePacket.Y));
                 break;
         }
 

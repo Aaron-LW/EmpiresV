@@ -59,7 +59,7 @@ public class TileEngine
                 int localChunkX = x * GamingState.TILE_WIDTH - chunkX;
                 int localChunkY = y * GamingState.TILE_HEIGHT - chunkY;
 
-                chunk.PlaceTileAt(new Vector2(localChunkX, localChunkY), AssetManager.GetTexture("Grass"), brightness);
+                chunk.PlaceTileAt(new Vector2(localChunkX, localChunkY), AssetManager.Get<Texture2D>("Grass"), brightness);
             }
         }
     }
@@ -76,7 +76,7 @@ public class TileEngine
             int oreY = random.Next(0, _mapHeight * GamingState.TILE_HEIGHT);
 
             (int x, int y) tilePos = AlignToGrid(oreX, oreY);
-            PlaceTile(AssetManager.GetTexture("CoalTile"), new Vector2(tilePos.x, tilePos.y));
+            PlaceTile(AssetManager.Get<Texture2D>("CoalTile"), new Vector2(tilePos.x, tilePos.y));
         }
     }
 
@@ -178,8 +178,8 @@ public class TileEngine
     {
         ((int x, int y), Chunk chunk) = GetOrCreateChunk((int)worldPosition.X, (int)worldPosition.Y);
 
-        float chunkX = worldPosition.X - x;
-        float chunkY = worldPosition.Y - y;
+        float chunkX = Math.Abs(worldPosition.X - x);
+        float chunkY = Math.Abs(worldPosition.Y - y);
 
         if (!chunk.RemoveTileAt(new Vector2(chunkX, chunkY)))
             return false;
@@ -242,7 +242,7 @@ public class TileEngine
                 if (noiseValue < 0.4f) brightness = 0.4f;
 
                 Vector2 tileChunkPosition = new Vector2(x * GamingState.TILE_WIDTH, y * GamingState.TILE_HEIGHT);
-                chunk.PlaceTileAt(tileChunkPosition, AssetManager.GetTexture("Grass"), brightness);
+                chunk.PlaceTileAt(tileChunkPosition, AssetManager.Get<Texture2D>("Grass"), brightness);
             }
         } 
 

@@ -155,6 +155,14 @@ public class Server
                     await stream.WriteAsync(framedData);
                 }
                 break;
+
+            case PacketId.PACKET_PLACE_TILE:
+                await BroadCastPacketTcp(data, playerClient);
+                break;
+
+            case PacketId.PACKET_REMOVE_TILE:
+                await BroadCastPacketTcp(data, playerClient);
+                break;
         }
     }
 

@@ -7,10 +7,12 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <PublishAot>true</PublishAot>
+    <IsAotCompatible>true</IsAotCompatible>
+    <StripSymbols>true</StripSymbols>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="SmashFramework" Version="1.1.47" />
+    <PackageReference Include="SmashFramework" Version="1.1.51" />
   </ItemGroup>
 
   <ItemGroup>

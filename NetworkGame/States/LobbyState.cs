@@ -24,7 +24,7 @@ public class LobbyState : GameState
 
     public LobbyState(StateResult previousStateResult) : base(previousStateResult)
     {
-        _hostCrown = AssetManager.GetTexture("HostCrown");
+        _hostCrown = AssetManager.Get<Texture2D>("HostCrown");
 
         _userPlayerData = new PlayerData { Host = previousStateResult.PlayerData.Host, Username = previousStateResult.PlayerData.Username };
 

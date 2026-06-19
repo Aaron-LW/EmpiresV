@@ -41,8 +41,8 @@ public class App : Application
         AssetManager.SetDefaultScaleMode(ScaleMode.Nearest);
         AssetManager.SetAssetRootDirectory(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets"));
 
-        AssetManager.LoadFont("Roboto.ttf");
-        Font = AssetManager.GetFont("Roboto", POINT_SIZE);
+        AssetManager.LoadFont("Roboto.ttf", POINT_SIZE);
+        Font = AssetManager.Get<Font>("Roboto");
 
         AssetManager.LoadTexture("TextureAtlas.png", _renderer);
         AssetManager.AddTextureRegion("HostCrown", new TextureRegion("TextureAtlas", 0, 0, 19, 15));
@@ -51,7 +51,7 @@ public class App : Application
         AssetManager.AddTextureRegion("mogus", new TextureRegion("TextureAtlas", 32, 0, 16, 16));
         AssetManager.AddTextureRegion("Selector", new TextureRegion("TextureAtlas", 0, 32, 16, 16));
 
-        TextureAtlas = AssetManager.GetTexture("TextureAtlas");
+        TextureAtlas = AssetManager.Get<Texture2D>("TextureAtlas");
 
         _renderer.SetVSyncEnabled(false);
         _renderer.SetRenderBlendMode(BlendMode.Blend);
