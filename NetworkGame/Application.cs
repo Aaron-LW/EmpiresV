@@ -12,6 +12,8 @@ public class App : Application
     public const int POINT_SIZE = 25;
     public static Font Font = null!;
 
+    public static string DataPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data");
+
     public static Texture2D TextureAtlas { get; private set; } = null!;
 
     public static float WindowWidth => _window!.Width;
@@ -55,6 +57,11 @@ public class App : Application
 
         _renderer.SetVSyncEnabled(false);
         _renderer.SetRenderBlendMode(BlendMode.Blend);
+
+        if (!Directory.Exists(DataPath))
+        {
+            Directory.CreateDirectory(DataPath);
+        }
 
         if (debugGame)
         {
@@ -200,6 +207,43 @@ public class App : Application
                 }
             }
         };
+    }
+
+    public static void SaveData(string file, byte[] data)
+    {
+        if (data.Length == 0) return;
+        string fullPath = Path.Combine(DataPath, file);
+
+        if (!File.Exists(fullPath))
+        {
+            using (File.Create(fullPath)) { };
+        }
+
+        File.WriteAllBytes(fullPath, data);
+    }
+
+    public static void TryDeleteData(string file)
+    {
+        string fullPath = Path.Combine(DataPath, file);
+
+        if (File.Exists(fullPath))
+        {
+            File.Delete(fullPath);
+        } 
+    }
+
+    public static byte[]? TryReadData(string file)
+    {
+        string fullPath = Path.Combine(DataPath, file);
+
+        if (File.Exists(fullPath))
+        {
+            return File.ReadAllBytes(fullPath);
+        }  
+        else
+        {
+            return null;
+        }
     }
 
 

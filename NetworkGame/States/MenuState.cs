@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Numerics;
+using System.Text;
 using SDL3;
 using Smash.Graphics;
 using Smash.Input;
@@ -18,6 +19,9 @@ public class MenuState : GameState
 
     public MenuState(StateResult previousStateResult) : base(previousStateResult)
     {
+        byte[]? username = App.TryReadData("username");
+        byte[]? ip = App.TryReadData("ip");
+
         _usernameField = new InputField()
         {
             X = 150,
@@ -26,7 +30,7 @@ public class MenuState : GameState
             Height = 50,
             BackgroundColor = Color.FromArgb(35, 35, 35),
             TextColor = Color.White,
-            Text = "",
+            Text = username == null ? "" : Encoding.UTF8.GetString(username),
             RequireInput = true
         };
 
@@ -38,6 +42,7 @@ public class MenuState : GameState
             Height = 50,
             BackgroundColor = Color.FromArgb(35, 35, 35),
             TextColor = Color.White,
+            Text = ip == null ? "" : Encoding.UTF8.GetString(ip),
         };
 
         _inputFields.Add(_usernameField);
@@ -115,6 +120,7 @@ public class MenuState : GameState
                 if (inputField.Selected)
                 {
                     inputField.SendTextInput(InputHandler.TextInput);
+                    SaveField(inputField);
                 }
             }
         }
@@ -126,6 +132,7 @@ public class MenuState : GameState
                 if (inputField.Selected)
                 {
                     inputField.SendTextInput(InputHandler.IsKeyDown(SDL.Keycode.LCtrl) ? "BackspaceAll" : "Backspace");
+                    SaveField(inputField);
                 }
             }
         }
@@ -139,6 +146,7 @@ public class MenuState : GameState
                     if (inputField.Selected)
                     {
                         inputField.Text += SDL.GetClipboardText();
+                        SaveField(inputField);
                     }
                 }
             }
@@ -187,5 +195,32 @@ public class MenuState : GameState
     {
         SDL.SetCursor(SDL.GetDefaultCursor());
         base.OnStateFinish(menuStateResult);
+    }
+
+    private void SaveField(InputField inputField)
+    {
+        if (inputField == _usernameField)
+        {
+            if (_usernameField.Text != string.Empty)
+            {
+                App.SaveData("username", Encoding.UTF8.GetBytes(_usernameField.Text!));
+            }
+            else
+            {
+                App.TryDeleteData("username");
+            }
+        }
+
+        if (inputField == _ipField)
+        {
+            if (_ipField.Text != string.Empty)
+            {
+                App.SaveData("ip", Encoding.UTF8.GetBytes(_ipField.Text!));
+            }
+            else
+            {
+                App.TryDeleteData("ip");
+            } 
+        }
     }
 }
