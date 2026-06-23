@@ -180,7 +180,7 @@ public class GamingState : GameState
             int textureId = AssetManager.GetAssetId("CoalTile");
             if (_tileEngine.PlaceTile(AssetManager.Get<Texture2D>(textureId), _mouseWorldPos))
             {
-                _ = App.SendPacketTcp(new PlaceTilePacket(null) { X = (int)_mouseWorldPos.X, Y = (int)_mouseWorldPos.Y, TextureId = textureId }.Serialize());
+                _ = App.SendPacketTcp(new PlaceTilePacket(null) { X = _mouseWorldPos.X, Y = _mouseWorldPos.Y, TextureId = textureId }.Serialize());
             }
         }
 
@@ -188,7 +188,7 @@ public class GamingState : GameState
         {
             if (_tileEngine.RemoveTile(_mouseWorldPos))
             {
-                _ = App.SendPacketTcp(new RemoveTilePacket(null) { X = (int)_mouseWorldPos.X, Y = (int)_mouseWorldPos.Y }.Serialize());
+                _ = App.SendPacketTcp(new RemoveTilePacket(null) { X = _mouseWorldPos.X, Y = _mouseWorldPos.Y }.Serialize());
             }
         }
     }
