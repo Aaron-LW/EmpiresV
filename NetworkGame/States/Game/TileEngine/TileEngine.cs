@@ -23,6 +23,7 @@ public class TileEngine
     private (int x, int y)? _lastVisibleChunkOrigin = null;
 
     private FastNoiseLite _noise;
+    private FastNoiseLite _continentNoise;
 
     public TileEngine(int mapWidth, int mapHeight, float baseZoom, int seed, bool generateChunks)
     {
@@ -38,6 +39,9 @@ public class TileEngine
         _noise.SetCellularReturnType(FastNoiseLite.CellularReturnType.CellValue);
         _noise.SetCellularJitter(0.5f);
         _noise.SetFrequency(0.002f);
+
+        _continentNoise = new(seed);
+        _continentNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
     }
 
     public void GenerateWorld()
@@ -233,16 +237,28 @@ public class TileEngine
         {
             for (int x = 0; x < Chunk.CHUNK_WIDHT; x++)
             {
-                float noiseValue = _noise.GetNoise(worldX + x * GamingState.TILE_WIDTH, worldY + y * GamingState.TILE_HEIGHT);
-
-                float brightness = 1f;
-
-                if (noiseValue < 1f) brightness = 1;
-                if (noiseValue < 0.65f) brightness = 0.65f;
-                if (noiseValue < 0.4f) brightness = 0.4f;
+                float scale = 20;
+                float groundNoise = _continentNoise.GetNoise((worldX / GamingState.TILE_WIDTH + x) / scale, (worldY / GamingState.TILE_HEIGHT + y) / scale);
 
                 Vector2 tileChunkPosition = new Vector2(x * GamingState.TILE_WIDTH, y * GamingState.TILE_HEIGHT);
-                chunk.PlaceTileAt(tileChunkPosition, AssetManager.Get<Texture2D>("Grass"), brightness);
+
+                if (groundNoise > 0.65f)
+                {
+                    float noiseValue = _noise.GetNoise(worldX + x * GamingState.TILE_WIDTH, worldY + y * GamingState.TILE_HEIGHT);
+
+                    float brightness = 1f;
+
+                    if (noiseValue < 1f) brightness = 1;
+                    if (noiseValue < 0.65f) brightness = 0.65f;
+                    if (noiseValue < 0.4f) brightness = 0.4f;
+
+                    chunk.PlaceTileAt(tileChunkPosition, AssetManager.Get<Texture2D>("Grass"), brightness);
+                }
+                else
+                {
+                    chunk.PlaceTileAt(tileChunkPosition, AssetManager.Get<Texture2D>("Water"), 1);
+                }
+
             }
         } 
 

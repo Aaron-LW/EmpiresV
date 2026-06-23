@@ -54,6 +54,7 @@ public class App : Application
         AssetManager.AddTextureRegion("CoalTile", new TextureRegion("TextureAtlas", 16, 16, 16, 16));
         AssetManager.AddTextureRegion("mogus", new TextureRegion("TextureAtlas", 32, 0, 16, 16));
         AssetManager.AddTextureRegion("Selector", new TextureRegion("TextureAtlas", 0, 32, 16, 16));
+        AssetManager.AddTextureRegion("Water", new TextureRegion("TextureAtlas", 16, 32, 16, 16));
 
         TextureAtlas = AssetManager.Get<Texture2D>("TextureAtlas");
 

@@ -17,6 +17,8 @@ public class GamingState : GameState
 
     private const int CAMERA_SPEED = 1000;
 
+    private const float MIN_ZOOM = 0.1f;
+
     private const int CHAT_LINE_SPACING = 30;
     private const int CHAT_BASE_COOLDOWN = 4;
     private const int CHAT_MAX_MESSAGES = 10;
@@ -158,7 +160,7 @@ public class GamingState : GameState
             float previousZoom = _preferredZoom;
 
             _preferredZoom += InputHandler.ScrollWheelDelta / (20 / _zoom);
-            _preferredZoom = Math.Clamp(_preferredZoom, 0.01f, 2f);
+            _preferredZoom = Math.Clamp(_preferredZoom, MIN_ZOOM, 2f);
 
             float greaterZoom = Math.Min(previousZoom, _preferredZoom);
             _tileEngine.UpdateVisibleChunks(_cameraPosition, greaterZoom);
@@ -237,8 +239,8 @@ public class GamingState : GameState
         }
 
         renderer.RenderText(App.Font, $"RAM: {_ramUsage} MB", new Vector2(20, 20), Color.White);
-        renderer.RenderText(App.Font, $"Chunks: {_backgroundTileEngine.GetChunkAmount()}", new Vector2(20, 60), Color.White);
-        renderer.RenderText(App.Font, $"Visible Chunks: {_backgroundTileEngine.GetVisibleChunkAmount()}", new Vector2(20, 100), Color.White);
+        renderer.RenderText(App.Font, $"Chunks: {_backgroundTileEngine.GetChunkAmount() + _tileEngine.GetChunkAmount()}", new Vector2(20, 60), Color.White);
+        renderer.RenderText(App.Font, $"Visible Chunks: {_backgroundTileEngine.GetVisibleChunkAmount() + _tileEngine.GetVisibleChunkAmount()}", new Vector2(20, 100), Color.White);
     }
 
     public override void ForwardPacket(byte[] data)
