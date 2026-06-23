@@ -39,6 +39,8 @@ public class App : Application
     {
         CreateWindowAndRenderer("Networkgame", 1080, 800, out _window, out _renderer);
         _window.SetWindowResizable(true);
+        
+        ExtractAssets();
 
         AssetManager.SetDefaultScaleMode(ScaleMode.Nearest);
         AssetManager.SetAssetRootDirectory(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets"));
@@ -414,6 +416,28 @@ public class App : Application
 
             _currentState?.ForwardPacket(buffer[0..bytesRead]);
             buffer = new byte[1024];
+        }
+    }
+
+    private void ExtractAssets()
+    {
+        string assetDirPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets");
+        if (!Directory.Exists(assetDirPath))
+        {
+            Directory.CreateDirectory(assetDirPath);
+        }
+
+        for (int i = 0; i < GeneratedAssets.Assets.Length; i++)
+        {
+            string asset = GeneratedAssets.Assets[i];
+            int start = asset.IndexOf("|") + 1;
+
+            string fileName = asset.Substring(0, start - 1);
+            Console.WriteLine("Extracting: " + fileName);
+
+            byte[] bytes = Convert.FromBase64String(asset.Substring(start, asset.Length - start));
+
+            File.WriteAllBytes(Path.Combine(assetDirPath, fileName), bytes);
         }
     }
 }
